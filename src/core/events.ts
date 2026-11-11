@@ -37,11 +37,15 @@ export type GameEvents = {
   /** a dashing player crashed into the other one */
   bump: { player: number; x: number; y: number; force: number };
   land: { player: number; x: number; y: number; force: number };
+  /** both players hit the ball at once: it pops up */
+  clash: { x: number; y: number };
   bounce: { surface: Surface; x: number; y: number; speed: number };
   goal: { scorer: number; x: number; y: number; golden: boolean };
   whistle: { kind: 'start' | 'end' | 'golden' };
   matchEnd: { winner: number };
   superArmed: { player: number };
+  /** a charged player touched the ball: the wind-up before the super shot */
+  superWindup: { player: number; id: string; x: number; y: number };
   superShot: { player: number; id: string; x: number; y: number };
   superHit: { player: number; x: number; y: number };
   powerSpawn: { type: string; x: number };

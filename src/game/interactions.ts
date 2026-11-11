@@ -6,11 +6,11 @@ import type { Player } from './player';
 
 const c = makeContact();
 
-const HEADER_MIN_POP = 280;
+const HEADER_MIN_POP = 360;
 const HEADER_FORWARD = 110;
 const HEADER_MAX = 370;
 /** absolute speed cap of a header: standing, plus what a jump / dash adds */
-const HEADER_ABS = 470;
+const HEADER_ABS = 540;
 const KICK_REACH_BONUS = 13;
 const KICK_ACTIVE_FROM = 0.18;
 // super energy gained per action (1 = full bar)
@@ -67,7 +67,7 @@ function tryKick(ball: Ball, p: Player, events: Emitter<GameEvents>): boolean {
   // Sweet spot: the ball meets the foot mid-swing (press kick just before it arrives).
   const sweet = 1 - clamp(Math.abs(phase - KICK_SWEET) / 0.34, 0, 1);
   const power = 0.5 + 0.5 * sweet;
-  let elev = lerp(0.5, 1.1, clamp((phase - KICK_ACTIVE_FROM) / (1 - KICK_ACTIVE_FROM), 0, 1)); // ~29°..63°
+  let elev = lerp(0.62, 1.15, clamp((phase - KICK_ACTIVE_FROM) / (1 - KICK_ACTIVE_FROM), 0, 1)); // ~29°..63°
   if (ball.y < p.hipY - 14) elev *= 0.55; // volleys fly flatter
   const speed = (600 + 520 * power) * p.power * (p.fireT > 0 ? 1.22 : 1);
   ball.vx = p.facing * Math.cos(elev) * speed + p.vx * 0.35;
@@ -95,7 +95,7 @@ export function ballVsPlayer(ball: Ball, p: Player, events: Emitter<GameEvents>)
 
   // Head: lively bounce, adds the head's own motion, nudges the ball forward.
   if (circleCircle(ball.x, ball.y, ball.r, p.headX, p.headY, p.headR, c)) {
-    const impact = resolveBallContact(ball, c, 0.5, 0.5, p.vx, p.vy);
+    const impact = resolveBallContact(ball, c, 0.68, 0.5, p.vx, p.vy);
     if (impact > 0) {
       const rel = (ball.vx - p.vx) * c.nx + (ball.vy - p.vy) * c.ny;
       if (rel < HEADER_MIN_POP) {
@@ -134,7 +134,7 @@ export function ballVsPlayer(ball: Ball, p: Player, events: Emitter<GameEvents>)
 
   // Body: dead, soft contact (good for trapping the ball).
   if (circleCircle(ball.x, ball.y, ball.r, p.bodyX, p.bodyY, p.bodyR, c)) {
-    if (resolveBallContact(ball, c, 0.3, 0.4, p.vx, p.vy) > 0) registerTouch(ball, p, events);
+    if (resolveBallContact(ball, c, 0.45, 0.4, p.vx, p.vy) > 0) registerTouch(ball, p, events);
   }
 
   // Shoe at rest: lets you dribble and stop the ball.

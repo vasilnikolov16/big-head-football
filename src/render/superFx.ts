@@ -1,7 +1,7 @@
 import { FONT_DISPLAY, GROUND_Y, INK } from '../core/constants';
 import { clamp, easeOutBack, lerp } from '../core/math';
 import type { RenderView } from './view';
-import { SUPER_INFO, type SuperShot } from '../game/supers';
+import { SUPER_INFO, WINDUP, type SuperShot } from '../game/supers';
 import { drawBall } from './ballDraw';
 
 interface TrailPt {
@@ -32,6 +32,13 @@ export class SuperFx {
         this.warpFrom = null;
         this.warpTo = null;
       }
+    }
+    // wind-up: the ball is held, the shot starts from here
+    if (s && s.phase < 0) {
+      this.startX = bx;
+      this.startY = by;
+      this.trail = [];
+      return;
     }
     // the laser beam starts where it is fired (after the lift)
     if (s?.id === 'laser' && s.phase < 2) {
@@ -213,10 +220,56 @@ export class SuperFx {
     return 1;
   }
 
+  /** Energy gathering into the held ball during the wind-up. */
+  private drawWindup(ctx: CanvasRenderingContext2D, s: SuperShot, bx: number, by: number, r: number, t: number): void {
+    const color = SUPER_INFO[s.id].color;
+    const p = clamp(s.t / WINDUP, 0, 1);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    // glow that grows as it charges
+    const R = r * (2 + p * 2.2);
+    const g = ctx.createRadialGradient(bx, by, r * 0.4, bx, by, R);
+    g.addColorStop(0, '#ffffffcc');
+    g.addColorStop(0.3, color + 'cc');
+    g.addColorStop(1, color + '00');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(bx, by, R, 0, Math.PI * 2);
+    ctx.fill();
+    // rings collapsing into the ball
+    for (let i = 0; i < 3; i++) {
+      const k = (s.t * 2.4 + i / 3) % 1;
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = k * 0.9;
+      ctx.lineWidth = 2 + k * 4;
+      ctx.beginPath();
+      ctx.arc(bx, by, r + (1 - k) * 130, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    // sparks streaking inwards
+    ctx.globalAlpha = 1;
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 12; i++) {
+      const a = i * 2.39996 + Math.floor(s.t * 6 + i) * 1.3;
+      const k = (s.t * 3 + i * 0.137) % 1;
+      const d0 = r + (1 - k) * 150;
+      ctx.strokeStyle = i % 2 ? color : '#ffffff';
+      ctx.globalAlpha = 0.9 * k;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(bx + Math.cos(a) * d0, by + Math.sin(a) * d0);
+      ctx.lineTo(bx + Math.cos(a) * (d0 + 26), by + Math.sin(a) * (d0 + 26));
+      ctx.stroke();
+    }
+    ctx.restore();
+    void t;
+  }
+
   /** On top of the ball. */
   drawFront(ctx: CanvasRenderingContext2D, m: RenderView, bx: number, by: number, r: number, t: number): void {
     const s = m.superShot;
-    if (s && !s.hidden) {
+    if (s && s.phase < 0) this.drawWindup(ctx, s, bx, by, r, t);
+    else if (s && !s.hidden) {
       const color = SUPER_INFO[s.id].color;
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';

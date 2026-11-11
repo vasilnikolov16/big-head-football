@@ -28,6 +28,7 @@ export class GameAudio {
       ev.on('dash', () => {
         if (!quiet) a.play('dash', 0.8);
       }),
+      ev.on('clash', () => a.play('kickPerfect', 0.8 * v)),
       ev.on('bump', (e) => a.play('bump', (0.5 + e.force / 1600) * v)),
       ev.on('land', (e) => {
         if (!quiet && e.force > 500) a.play('land', e.force / 1600);
@@ -37,7 +38,11 @@ export class GameAudio {
         a.play(e.kind === 'start' ? 'whistleStart' : e.kind === 'end' ? 'whistleEnd' : 'whistleGolden');
       }),
       ev.on('goal', () => a.play('goal', v)),
-      ev.on('superArmed', () => a.play('superArmed', v)),
+      ev.on('superArmed', (e) => {
+        a.play('superArmed', 0.6 * v);
+        a.playArm(m.players[e.player].char.super as SuperSfx);
+      }),
+      ev.on('superWindup', (e) => a.playCharge(e.id as SuperSfx)),
       ev.on('superShot', (e) => a.playSuper(e.id as SuperSfx)),
       ev.on('superHit', () => a.play('superHit', v)),
       ev.on('powerSpawn', () => {

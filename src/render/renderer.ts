@@ -63,6 +63,11 @@ export class Renderer {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // a window with no size yet (app still opening, hidden tab): try again on the next frame
+    if (!(vw > 1 && vh > 1)) {
+      this.lastSize = '';
+      return;
+    }
     const key = `${vw}x${vh}@${dpr}`;
     if (key === this.lastSize) return;
     this.lastSize = key;
@@ -117,6 +122,7 @@ export class Renderer {
   }
 
   render(m: RenderView, alpha: number, t: number, opts: RenderOptions): void {
+    if (!this.lastSize) this.resize();
     const ctx = this.ctx;
     const fx = this.fx;
     const replay = opts.replayT != null;

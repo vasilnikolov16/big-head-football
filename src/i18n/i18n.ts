@@ -128,8 +128,8 @@ const S: Record<string, [string, string]> = {
     'Kicks are strongest if you press just before the ball reaches your foot. A late kick lobs the ball high.',
   ],
   'howto.tip2': [
-    'Лентата за супер удар се пълни сама с времето и по-бързо, когато докосваш топката. Пълна лента → супер бутона → героят светва и следващото му докосване изстрелва удара. Зареденият удар остава и след гол, но не може да се ползва, докато се празнува гол.',
-    'The super bar fills by itself over time and faster when you touch the ball. Full bar → super button → your hero glows and the next touch fires the shot. An armed shot stays armed after a goal, but it can’t be used during goal celebrations.',
+    'Лентата за супер удар се пълни сама с времето и по-бързо, когато докосваш топката. Пълна лента → супер бутона → героят светва, а следващото му докосване хваща топката: играта замръзва за миг, топката се зарежда и ударът изригва. Зареденият удар остава и след гол, но не може да се ползва, докато се празнува гол.',
+    'The super bar fills by itself over time and faster when you touch the ball. Full bar → super button → your hero glows, and the next touch catches the ball: the game freezes for a moment, the ball charges up and the shot erupts. An armed shot stays armed after a goal, but it can’t be used during goal celebrations.',
   ],
   'howto.tip3': ['Удряй бонусите с топката (или ги докосни), за да ги вземеш.', 'Hit power-ups with the ball (or touch them) to collect them.'],
   'howto.tip4': ['При равенство след края на времето — златен гол: следващият печели.', 'A draw at full time means golden goal: next goal wins.'],

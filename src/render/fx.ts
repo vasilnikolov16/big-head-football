@@ -92,18 +92,31 @@ export class Fx {
       ev.on('dash', (e) => {
         if (e.y > GROUND_Y - 4) this.particles.dashPuff(e.x, e.dir);
       }),
+      ev.on('clash', (e) => {
+        this.addShake(4);
+        this.particles.sparks(e.x, e.y, 12, '#ffffff', 480);
+        if (e.y > GROUND_Y - 60) this.particles.grass(e.x, 0.6);
+      }),
       ev.on('bump', (e) => {
         this.addShake(5);
         this.particles.stars(e.x, e.y, 6, '#ffe14d');
         this.particles.sparks(e.x, e.y, 8, '#ffffff', 380);
       }),
+      ev.on('superWindup', (e) => {
+        const color = SUPER_INFO[e.id as keyof typeof SUPER_INFO]?.color ?? '#ffffff';
+        this.addShake(5);
+        this.particles.stars(e.x, e.y, 8, color);
+        if (cinematic) this.cinematic.start(e.player as 0 | 1, m.players[e.player].char);
+        st.excitement = Math.max(st.excitement, 0.6);
+      }),
       ev.on('superShot', (e) => {
         const color = SUPER_INFO[e.id as keyof typeof SUPER_INFO]?.color ?? '#ffffff';
-        this.addShake(12);
-        this.particles.sparks(e.x, e.y, 40, color, 900);
-        this.particles.stars(e.x, e.y, 14, color);
-        if (cinematic) this.cinematic.start(e.player as 0 | 1, m.players[e.player].char);
-        st.excitement = Math.max(st.excitement, 0.8);
+        this.addShake(14);
+        this.flash = Math.max(this.flash, 0.35);
+        this.particles.sparks(e.x, e.y, 46, color, 950);
+        this.particles.stars(e.x, e.y, 16, color);
+        this.cinematic.release();
+        st.excitement = Math.max(st.excitement, 0.85);
       }),
       ev.on('superArmed', (e) => {
         const p = m.players[e.player];

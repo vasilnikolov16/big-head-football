@@ -47,13 +47,41 @@ export class AudioEngine {
   onReady: (() => void) | null = null;
 
   constructor() {
+    // iPhone: Web Audio is silenced by the ring/silent switch unless the page
+    // asks for the "playback" audio session (Safari 16.4+).
+    const nav = navigator as Navigator & { audioSession?: { type: string } };
+    try {
+      if (nav.audioSession) nav.audioSession.type = 'playback';
+    } catch {
+      /* not supported */
+    }
+    // Browsers only allow sound after a user gesture. iOS counts touchend /
+    // click (not touchstart), so listen to all of them; after the app was in the
+    // background iOS leaves the context "interrupted", so resume every time.
     const unlock = (): void => {
       this.ensure();
-      if (this.ctx?.state === 'suspended') void this.ctx.resume();
+      const ctx = this.ctx;
+      if (!ctx) return;
+      if (ctx.state !== 'running') void ctx.resume().catch(() => {});
+      if (!this.primed) {
+        // a silent sample started inside the gesture fully unlocks iOS
+        this.primed = true;
+        const src = ctx.createBufferSource();
+        src.buffer = ctx.createBuffer(1, 1, 22050);
+        src.connect(ctx.destination);
+        src.start(0);
+      }
     };
-    window.addEventListener('keydown', unlock, { capture: true });
-    window.addEventListener('pointerdown', unlock, { capture: true });
+    for (const ev of ['keydown', 'pointerdown', 'pointerup', 'touchstart', 'touchend', 'mousedown', 'click']) {
+      window.addEventListener(ev, unlock, { capture: true, passive: true });
+    }
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) void this.ctx?.suspend().catch(() => {});
+      else if (this.ctx && this.ctx.state !== 'running') void this.ctx.resume().catch(() => {});
+    });
   }
+
+  private primed = false;
 
   get ready(): boolean {
     return this.ctx !== null && this.ctx.state === 'running';
@@ -399,6 +427,107 @@ export class AudioEngine {
     o.connect(flt).connect(g).connect(this.sfxBus);
     o.start(t);
     o.stop(t + dur + 0.05);
+  }
+
+  /** Distorted guitar chord (rocker): frequencies, start, length, volume, swell = slow attack. */
+  private guitar(freqs: number[], t: number, dur: number, vol: number, swell = false): void {
+    const ctx = this.ctx!;
+    const shaper = ctx.createWaveShaper();
+    shaper.curve = this.distCurve;
+    const g = ctx.createGain();
+    if (swell) {
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + dur * 0.9);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    } else this.env(g, t, 0.01, vol, dur);
+    shaper.connect(g).connect(this.sfxBus);
+    for (const fr of freqs) {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.value = fr;
+      o.connect(shaper);
+      o.start(t);
+      o.stop(t + dur + 0.05);
+    }
+  }
+
+  /** The hero's signature when the super is armed (button pressed with a full bar). */
+  playArm(id: SuperSfx): void {
+    if (!this.ready) return;
+    const t = this.ctx!.currentTime;
+    this.noiseHit(t, 0.35, 0.1, 'bandpass', 500, 3000, 2);
+    switch (id) {
+      case 'razor': // snip-snip of the barber's scissors
+        for (const d of [0, 0.13]) {
+          this.noiseHit(t + d, 0.05, 0.45, 'highpass', 6000, 6000, 3);
+          this.tone('triangle', 3200, 2400, t + d, 0.05, 0.12);
+        }
+        break;
+      case 'pounce': // a short "mrrp"
+        this.tone('triangle', 420, 760, t, 0.12, 0.24);
+        this.tone('triangle', 760, 520, t + 0.12, 0.16, 0.2);
+        break;
+      case 'laser': // robot beeps
+        [880, 1320, 1760].forEach((fr, i) => this.tone('square', fr, fr, t + i * 0.07, 0.05, 0.09));
+        break;
+      case 'sonic': // a power-chord stab
+        this.guitar([110, 165, 220], t, 0.4, 0.22);
+        break;
+      case 'yarn': // music-box plinks
+        [1047, 1319, 1568].forEach((fr, i) => this.tone('sine', fr, fr, t + i * 0.08, 0.35, 0.16, this.sfxBus, 0.002));
+        break;
+      case 'warp': // alien warble
+        this.tone('sine', 500, 1300, t, 0.12, 0.2);
+        this.tone('sine', 1300, 420, t + 0.12, 0.16, 0.2);
+        this.tone('sine', 420, 1100, t + 0.28, 0.12, 0.16);
+        break;
+      case 'thunder': // viking horn call
+        this.horn(147, t, 0.55, 0.16);
+        break;
+      case 'shadow': // a blade drawn from its sheath
+        this.noiseHit(t, 0.3, 0.3, 'bandpass', 3000, 8000, 6);
+        this.tone('triangle', 2600, 3300, t, 0.3, 0.07);
+        break;
+    }
+  }
+
+  /** The wind-up before the super shot (~1 s): a shared riser plus the hero's own colour. */
+  playCharge(id: SuperSfx): void {
+    if (!this.ready) return;
+    const t = this.ctx!.currentTime;
+    const D = 1.0;
+    this.noiseHit(t, D, 0.16, 'bandpass', 300, 3200, 1.5, this.sfxBus, D * 0.85);
+    this.tone('sine', 110, 440, t, D, 0.16, this.sfxBus, D * 0.8);
+    switch (id) {
+      case 'razor': // scissors snipping faster and faster
+        [0, 0.3, 0.52, 0.68, 0.8, 0.9].forEach((d) => this.noiseHit(t + d, 0.04, 0.35, 'highpass', 6000, 6000, 3));
+        break;
+      case 'pounce': // purring, then a hiss
+        for (let i = 0; i < 12; i++) this.tone('sawtooth', 60, 50, t + i * 0.06, 0.05, 0.05);
+        this.noiseHit(t + 0.72, 0.28, 0.25, 'highpass', 3500, 5000, 1);
+        break;
+      case 'laser': // charging whine + fast beeps
+        this.tone('sawtooth', 200, 2600, t, D * 0.95, 0.07, this.sfxBus, 0.3);
+        for (let i = 0; i < 6; i++) this.tone('square', 1200 + i * 160, 1200 + i * 160, t + i * 0.15, 0.04, 0.06);
+        break;
+      case 'sonic': // a chord swelling with feedback
+        this.guitar([82, 123, 165], t, D, 0.2, true);
+        break;
+      case 'yarn': // a rising music-box tune
+        [523, 659, 784, 1047, 1319, 1568].forEach((fr, i) => this.tone('sine', fr, fr, t + i * 0.15, 0.3, 0.14, this.sfxBus, 0.002));
+        break;
+      case 'warp': // wobbling space sound
+        for (let i = 0; i < 8; i++) this.tone('sine', 300 + i * 90, 600 + i * 150, t + i * 0.12, 0.12, 0.1);
+        break;
+      case 'thunder': // rumble and a long horn
+        this.noiseHit(t, D, 0.4, 'lowpass', 180, 260, 1, this.sfxBus, 0.3);
+        this.horn(110, t + 0.1, 0.85, 0.14);
+        break;
+      case 'shadow': // wind and taiko drums
+        this.noiseHit(t, D, 0.18, 'bandpass', 700, 2200, 2, this.sfxBus, 0.4);
+        for (const d of [0, 0.4, 0.7, 0.88]) this.drum('kick', t + d, 0.7, this.sfxBus);
+        break;
+    }
   }
 
   /** Signature sound of each hero's super shot. */

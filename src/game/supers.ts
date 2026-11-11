@@ -21,6 +21,9 @@ export const SUPER_INFO: Record<SuperId, SuperInfo> = {
   shadow: { name: { bg: 'Сенки', en: 'Shadow Clones' }, desc: { bg: 'Три еднакви топки — само една е истинска.', en: 'Three identical balls — only one is real.' }, color: '#b8a9ff' },
 };
 
+/** Seconds the game freezes while the hero winds up the super shot. */
+export const WINDUP = 1.05;
+
 /** Height the laser and shadow shots rise to before firing (above any head). */
 const LIFT_Y = GROUND_Y - 270;
 
@@ -39,8 +42,10 @@ export interface Decoy {
 }
 
 export class SuperShot {
+  /** seconds in the current stage (the wind-up, then the flight from 0 again) */
   t = 0;
-  phase = 0;
+  /** -1 = wind-up (ball held in front of the hero), 0+ = the shot's own phases */
+  phase = -1;
   done = false;
   /** the opponent cannot block it (it passes through) */
   passThrough = false;
@@ -53,6 +58,10 @@ export class SuperShot {
   ty: number;
   private y0 = 0;
   private x0 = 0;
+  private fromX = 0;
+  private fromY = 0;
+  private holdX = 0;
+  private holdY = 0;
 
   constructor(
     readonly id: SuperId,
@@ -70,6 +79,43 @@ export class SuperShot {
   }
 
   // -------------------------------------------------------------- lifecycle
+
+  /** the ball is held for the wind-up; the whole match stands still */
+  get holding(): boolean {
+    return this.phase === -1 && !this.done;
+  }
+
+  /** Wind-up: the ball floats to a spot in front of the hero and charges up. */
+  begin(m: Match): void {
+    const b = m.ball;
+    const p = m.players[this.owner];
+    this.phase = -1;
+    this.t = 0;
+    this.fromX = b.x;
+    this.fromY = b.y;
+    this.holdX = Math.max(b.r + 4, Math.min(W - b.r - 4, p.x + p.facing * (p.halfW + b.r + 16)));
+    this.holdY = Math.max(p.headY - p.headR * 0.3, Math.min(p.y - b.r - 22, b.y));
+    b.vx = b.vy = 0;
+    b.gravityScale = 0;
+  }
+
+  private windup(m: Match, dt: number): void {
+    const b = m.ball;
+    const k = 1 - Math.pow(1 - Math.min(1, this.t / 0.32), 3);
+    const shake = Math.min(1, this.t / WINDUP) * 3;
+    b.x = this.fromX + (this.holdX - this.fromX) * k + Math.sin(this.t * 71) * shake;
+    b.y = this.fromY + (this.holdY - this.fromY) * k + Math.sin(this.t * 6) * 4 + Math.cos(this.t * 83) * shake;
+    b.vx = b.vy = 0;
+    b.angle += dt * (8 + this.t * 30) * this.dir;
+    if (this.t >= WINDUP) {
+      b.px = b.x;
+      b.py = b.y;
+      this.phase = 0;
+      this.t = 0;
+      this.start(m);
+      m.launchSuper(this);
+    }
+  }
 
   start(m: Match): void {
     const b = m.ball;
@@ -221,6 +267,10 @@ export class SuperShot {
   update(m: Match, dt: number): void {
     const b = m.ball;
     this.t += dt;
+    if (this.phase === -1) {
+      this.windup(m, dt);
+      return;
+    }
     const t = this.t;
     switch (this.id) {
       case 'laser':
@@ -326,7 +376,7 @@ export class SuperShot {
 
   /** Called after the physics step with the world impacts of this step. */
   afterStep(m: Match, imp: ImpactLog): void {
-    if (this.done) return;
+    if (this.done || this.phase === -1) return;
     const hitWorld = imp.ground > 0 || imp.wall > 0 || imp.bar > 0 || imp.ceiling > 0;
     if (!hitWorld) return;
     // rising/hovering phases may scrape the ceiling or floor without ending the shot
@@ -350,7 +400,7 @@ export class SuperShot {
 
   /** Should the ball ignore this player? Applies on-touch effects to the opponent. */
   ignores(m: Match, p: Player, overlapping: boolean): boolean {
-    if (this.hidden) return true;
+    if (this.hidden || this.phase === -1) return true;
     if (p.index === this.owner) return this.t < 0.25; // don't instantly re-touch your own shot
     if (!this.passThrough) return false;
     if (overlapping && !this.hitOpponent) {

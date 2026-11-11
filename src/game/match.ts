@@ -1,7 +1,7 @@
-import { GOAL_DEPTH, START_X, W } from '../core/constants';
+import { GOAL_DEPTH, GROUND_Y, START_X, W } from '../core/constants';
 import { Emitter, type GameEvents, type Surface } from '../core/events';
 import { rand } from '../core/math';
-import { t, tr } from '../i18n/i18n';
+import { t } from '../i18n/i18n';
 import { emptyIntent, type Controller, type PlayerIntent } from '../input/controls';
 import { Arena } from '../physics/arena';
 import { Ball, makeImpactLog, stepBall, collideBallWorld } from '../physics/ball';
@@ -9,7 +9,7 @@ import type { CharacterDef } from './characters';
 import { ballVsPlayer, playerVsPlayer, separatePlayerFromBall } from './interactions';
 import { Player } from './player';
 import { PowerUps } from './powerups';
-import { SUPER_INFO, SuperShot, updateDecoys, type Decoy } from './supers';
+import { SuperShot, updateDecoys, WINDUP, type Decoy } from './supers';
 
 export type MatchPhase = 'kickoff' | 'playing' | 'goal' | 'ended';
 
@@ -46,6 +46,10 @@ export interface Banner {
   subPlayer?: number;
 }
 
+/** two touches this close together (s) = a clash */
+const CLASH_WINDOW = 0.2;
+/** a ball stuck between both players this long pops up by itself */
+const STALL_TIME = 0.55;
 const KICKOFF_TIME = 1.1;
 const GOAL_TIME = 2.6;
 const BALL_DROP_Y = 170;
@@ -62,6 +66,11 @@ export class Match {
   private intents: [PlayerIntent, PlayerIntent] = [emptyIntent(), emptyIntent()];
   private idle = emptyIntent();
   private impacts = makeImpactLog();
+  /** match time each player last touched the ball (for clashes) */
+  private touchAt: [number, number] = [-9, -9];
+  private clashAt = -9;
+  /** seconds the ball has been stuck between the two players */
+  private stallT = 0;
 
   config: MatchConfig;
   score: [number, number] = [0, 0];
@@ -124,17 +133,23 @@ export class Match {
     this.ball.gravityScale = 1;
   }
 
+  /** A charged player touched the ball: everything freezes while the hero winds up. */
   private fireSuper(p: Player): void {
     this.endSuper();
-    p.charged = false;
-    p.energy = 0;
     const s = new SuperShot(p.char.super, p.index, this);
     this.superShot = s;
-    s.start(this);
+    s.begin(this);
+    p.setExpression('angry', WINDUP + 0.8);
+    this.players[1 - p.index].setExpression('shock', WINDUP + 0.9);
+    this.events.emit('superWindup', { player: p.index, id: s.id, x: this.ball.x, y: this.ball.y });
+  }
+
+  /** End of the wind-up: the ball is struck (called by the super shot). */
+  launchSuper(s: SuperShot): void {
+    const p = this.players[s.owner];
+    p.charged = false;
+    p.energy = 0;
     this.supersUsed[p.index]++;
-    p.setExpression('angry', 0.8);
-    this.players[1 - p.index].setExpression('shock', 0.9);
-    this.callout = { text: tr(SUPER_INFO[s.id].name).toUpperCase() + '!', color: SUPER_INFO[s.id].color, player: p.index, t: 0, ref: { kind: 'super', id: s.id } };
     this.events.emit('superShot', { player: p.index, id: s.id, x: this.ball.x, y: this.ball.y });
   }
 
@@ -167,18 +182,24 @@ export class Match {
     }
 
     const controllable = this.phase === 'playing' || this.phase === 'goal';
+    // super-shot wind-up: both players stand still (fighting-game style freeze)
+    const hold = this.superShot?.holding === true;
     for (let i = 0; i < 2; i++) {
       const p = this.players[i];
       p.savePrev();
       const intent = this.intents[i];
       const ctrl = this.controllers[i];
       if (ctrl) ctrl.read(intent);
+      if (hold) {
+        p.tickAnimation(dt);
+        continue;
+      }
       // super shots can only be charged, armed and fired in open play (not after a goal)
       p.superLocked = this.phase !== 'playing';
       if (this.phase === 'playing') p.addEnergy(dt * ENERGY_PER_SEC);
       p.update(dt, controllable && ctrl ? intent : this.idle, this.arena, this.events);
     }
-    playerVsPlayer(this.players[0], this.players[1], this.events);
+    if (!hold) playerVsPlayer(this.players[0], this.players[1], this.events);
 
     // eyes follow the ball
     for (const p of this.players) {
@@ -199,12 +220,12 @@ export class Match {
       this.stepBallAndContacts(dt);
     }
 
-    this.powerups.update(this, dt);
+    if (!hold) this.powerups.update(this, dt);
 
     if (this.phase === 'playing') {
       this.updatePossession(dt);
       this.checkGoal();
-      if (this.phase === 'playing' && !this.golden) {
+      if (this.phase === 'playing' && !this.golden && !hold) {
         this.timeLeft -= dt;
         if (this.timeLeft <= 0) {
           this.timeLeft = 0;
@@ -223,6 +244,7 @@ export class Match {
     imp.ground = imp.wall = imp.bar = imp.ceiling = 0;
     const sup = this.superShot;
     if (sup) sup.update(this, dt);
+    if (sup?.holding) return; // the ball is held in place for the wind-up
     if (sup?.hidden) {
       // teleporting: the ball is nowhere
       b.savePrev();
@@ -243,10 +265,12 @@ export class Match {
       ballVsPlayer(b, p, this.events);
       const touched = b.lastTouch === p.index && b.sinceTouch === 0 && !touchedBefore;
       if (touched) {
+        this.touchAt[p.index] = this.time;
         if (p.charged && this.phase === 'playing') this.fireSuper(p);
         else if (sup && !sup.done) sup.finish(this); // blocked or touched again
       }
     }
+    this.checkClash(dt);
     collideBallWorld(b, this.arena, imp, dt);
     for (const p of this.players) {
       if (this.superShot && !this.superShot.done && this.superShot.ignores(this, p, false)) continue;
@@ -260,6 +284,33 @@ export class Match {
     for (const s of ['ground', 'wall', 'bar', 'ceiling'] as Surface[]) {
       if (imp[s] > 70) this.events.emit('bounce', { surface: s, x: b.x, y: b.y, speed: imp[s] });
     }
+  }
+
+  /**
+   * Both players kick or squeeze a low ball at the same moment: instead of
+   * getting stuck between them it squirts up into the air (a scramble).
+   */
+  private checkClash(dt: number): void {
+    const b = this.ball;
+    if (this.superShot || this.phase === 'kickoff') return;
+    const [p0, p1] = this.players;
+    const close = Math.abs(p0.x - p1.x) < p0.halfW + p1.halfW + b.r * 2 + 50;
+    // a low, slow ball that both players are fighting over
+    const contested =
+      close && b.y > GROUND_Y - 120 && Math.hypot(b.vx, b.vy) < 220 && Math.abs(b.x - p0.x) < 130 && Math.abs(b.x - p1.x) < 130;
+    this.stallT = contested ? this.stallT + dt : 0;
+    const [a, c] = this.touchAt;
+    const both = Math.abs(a - c) <= CLASH_WINDOW && this.time - Math.max(a, c) <= 0.001;
+    if (!(both && close) && this.stallT < STALL_TIME) return;
+    if (this.time - this.clashAt < 0.45 || b.y < GROUND_Y - 150) return;
+    this.clashAt = this.time;
+    this.stallT = 0;
+    b.vy = -rand(720, 880);
+    // squirt out over one of them, so the scramble resolves
+    b.vx = (Math.random() < 0.5 ? -1 : 1) * rand(170, 290);
+    b.spin = rand(-20, 20);
+    this.touchAt = [-9, -9];
+    this.events.emit('clash', { x: b.x, y: b.y });
   }
 
   private updatePossession(dt: number): void {

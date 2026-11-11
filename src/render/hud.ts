@@ -104,7 +104,8 @@ function energyBar(ctx: CanvasRenderingContext2D, m: RenderView, side: 0 | 1, t:
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
     ctx.fillRect(fx, y + 2, fw, 3);
   }
-  if (full || p.charged) {
+  // (hidden during the super-shot wind-up: the cinematic says it all)
+  if ((full || p.charged) && !(m.superShot && m.superShot.phase < 0)) {
     const pulse = 0.5 + 0.5 * Math.sin(t * (p.charged ? 18 : 7));
     ctx.shadowColor = '#ffd23f';
     ctx.shadowBlur = 10 + pulse * 14;
