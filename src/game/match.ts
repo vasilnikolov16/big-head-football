@@ -49,7 +49,7 @@ export interface Banner {
 /** two touches this close together (s) = a clash */
 const CLASH_WINDOW = 0.2;
 /** a ball stuck between both players this long pops up by itself */
-const STALL_TIME = 0.55;
+const STALL_TIME = 0.45;
 const KICKOFF_TIME = 1.1;
 const GOAL_TIME = 2.6;
 const BALL_DROP_Y = 170;
@@ -71,6 +71,7 @@ export class Match {
   private clashAt = -9;
   /** seconds the ball has been stuck between the two players */
   private stallT = 0;
+  private stallX = 0;
 
   config: MatchConfig;
   score: [number, number] = [0, 0];
@@ -131,6 +132,7 @@ export class Match {
     if (this.superShot) this.superShot.finish(this);
     this.superShot = null;
     this.ball.gravityScale = 1;
+    this.ball.dragScale = 1;
   }
 
   /** A charged player touched the ball: everything freezes while the hero winds up. */
@@ -262,7 +264,7 @@ export class Match {
         if (sup.ignores(this, p, near)) continue;
       }
       const touchedBefore = b.lastTouch === p.index && b.sinceTouch === 0;
-      ballVsPlayer(b, p, this.events);
+      ballVsPlayer(b, p, this.events, this.players[1 - p.index]);
       const touched = b.lastTouch === p.index && b.sinceTouch === 0 && !touchedBefore;
       if (touched) {
         this.touchAt[p.index] = this.time;
@@ -279,6 +281,7 @@ export class Match {
     if (this.superShot?.done) {
       this.superShot = null;
       b.gravityScale = 1;
+      b.dragScale = 1;
     }
 
     for (const s of ['ground', 'wall', 'bar', 'ceiling'] as Surface[]) {
@@ -295,19 +298,24 @@ export class Match {
     if (this.superShot || this.phase === 'kickoff') return;
     const [p0, p1] = this.players;
     const close = Math.abs(p0.x - p1.x) < p0.halfW + p1.halfW + b.r * 2 + 50;
-    // a low, slow ball that both players are fighting over
-    const contested =
-      close && b.y > GROUND_Y - 120 && Math.hypot(b.vx, b.vy) < 220 && Math.abs(b.x - p0.x) < 130 && Math.abs(b.x - p1.x) < 130;
-    this.stallT = contested ? this.stallT + dt : 0;
+    // a low ball both players are fighting over that isn't going anywhere
+    // (judged by position: while pinned its speed jumps around every step)
+    const contested = close && b.y > GROUND_Y - 120 && Math.abs(b.x - p0.x) < 140 && Math.abs(b.x - p1.x) < 140;
+    if (contested && Math.abs(b.x - this.stallX) < 70) this.stallT += dt;
+    else {
+      this.stallT = 0;
+      this.stallX = b.x;
+    }
     const [a, c] = this.touchAt;
     const both = Math.abs(a - c) <= CLASH_WINDOW && this.time - Math.max(a, c) <= 0.001;
     if (!(both && close) && this.stallT < STALL_TIME) return;
     if (this.time - this.clashAt < 0.45 || b.y < GROUND_Y - 150) return;
     this.clashAt = this.time;
     this.stallT = 0;
-    b.vy = -rand(720, 880);
+    b.vy = -rand(820, 960);
     // squirt out over one of them, so the scramble resolves
     b.vx = (Math.random() < 0.5 ? -1 : 1) * rand(170, 290);
+    b.ghostT = 0.16;
     b.spin = rand(-20, 20);
     this.touchAt = [-9, -9];
     this.events.emit('clash', { x: b.x, y: b.y });

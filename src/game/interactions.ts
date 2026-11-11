@@ -6,12 +6,14 @@ import type { Player } from './player';
 
 const c = makeContact();
 
-const HEADER_MIN_POP = 360;
-const HEADER_FORWARD = 110;
-const HEADER_MAX = 370;
+const HEADER_MIN_POP = 470;
+const HEADER_FORWARD = 130;
+const HEADER_MAX = 520;
 /** absolute speed cap of a header: standing, plus what a jump / dash adds */
-const HEADER_ABS = 540;
-const KICK_REACH_BONUS = 13;
+const HEADER_ABS = 700;
+const KICK_REACH_BONUS = 24;
+/** how far in front of the body a kick reaches */
+const KICK_ZONE = 44;
 const KICK_ACTIVE_FROM = 0.18;
 // super energy gained per action (1 = full bar)
 const ENERGY_TOUCH = 0.004;
@@ -53,23 +55,43 @@ function registerTouch(ball: Ball, p: Player, events: Emitter<GameEvents>): void
  * Hitting the ball early in the swing gives a low drive, late gives a lob,
  * and the middle of the swing ("sweet spot") gives the most power.
  */
-function tryKick(ball: Ball, p: Player, events: Emitter<GameEvents>): boolean {
+/** In front of the player, from the ground up to head height: the swing reaches it. */
+export function inKickZone(ball: { x: number; y: number; r: number }, p: Player): boolean {
+  const rel = (ball.x - p.x) * p.facing;
+  return rel > p.halfW * 0.2 && rel < p.halfW + ball.r + KICK_ZONE && ball.y < p.y && ball.y > p.headY - p.headR * 0.2;
+}
+
+/** The other player stands right in front of the ball: a normal kick would hit them. */
+function blockedBy(ball: Ball, p: Player, opp: Player | undefined): boolean {
+  if (!opp) return false;
+  const ahead = (opp.x - p.x) * p.facing;
+  return ahead > 0 && ahead < p.halfW + opp.halfW + ball.r * 2 + 46 && ball.y > p.hipY - 40 && opp.y > ball.y - 30;
+}
+
+function tryKick(ball: Ball, p: Player, events: Emitter<GameEvents>, opp?: Player): boolean {
   const phase = p.kickPhase;
   // The first part of the swing is the wind-up: the foot can't strike yet.
   if (phase < KICK_ACTIVE_FROM || p.kickHit) return false;
   const reach = ball.r + p.footR + KICK_REACH_BONUS;
   const dx = ball.x - p.footX;
   const dy = ball.y - p.footY;
-  if (dx * dx + dy * dy > reach * reach) return false;
+  // the foot itself, or anything in front of the player up to head height (volleys)
+  if (dx * dx + dy * dy > reach * reach && !inKickZone(ball, p)) return false;
   // Can't kick a ball that's behind you.
   if ((ball.x - p.x) * p.facing < -6) return false;
 
   // Sweet spot: the ball meets the foot mid-swing (press kick just before it arrives).
   const sweet = 1 - clamp(Math.abs(phase - KICK_SWEET) / 0.34, 0, 1);
   const power = 0.5 + 0.5 * sweet;
-  let elev = lerp(0.62, 1.15, clamp((phase - KICK_ACTIVE_FROM) / (1 - KICK_ACTIVE_FROM), 0, 1)); // ~29°..63°
+  let elev = lerp(0.72, 1.2, clamp((phase - KICK_ACTIVE_FROM) / (1 - KICK_ACTIVE_FROM), 0, 1)); // ~41°..69°
   if (ball.y < p.hipY - 14) elev *= 0.55; // volleys fly flatter
-  const speed = (600 + 520 * power) * p.power * (p.fireT > 0 ? 1.22 : 1);
+  let speed = (600 + 520 * power) * p.power * (p.fireT > 0 ? 1.22 : 1);
+  if (blockedBy(ball, p, opp)) {
+    // chip it over the player in the way instead of into them
+    elev = 1.3;
+    speed = Math.max(speed * 0.9, 900);
+    ball.ghostT = 0.12;
+  }
   ball.vx = p.facing * Math.cos(elev) * speed + p.vx * 0.35;
   ball.vy = -Math.sin(elev) * speed + Math.min(p.vy, 0) * 0.25;
   ball.spin = -p.facing * (8 + 22 * phase); // backspin -> the ball floats
@@ -90,12 +112,13 @@ function tryKick(ball: Ball, p: Player, events: Emitter<GameEvents>): boolean {
 }
 
 /** Ball vs one player's head, body and shoe. */
-export function ballVsPlayer(ball: Ball, p: Player, events: Emitter<GameEvents>): void {
-  if (tryKick(ball, p, events)) return;
+export function ballVsPlayer(ball: Ball, p: Player, events: Emitter<GameEvents>, opp?: Player): void {
+  if (tryKick(ball, p, events, opp)) return;
+  if (ball.ghostT > 0) return; // squirting out of a scramble
 
   // Head: lively bounce, adds the head's own motion, nudges the ball forward.
   if (circleCircle(ball.x, ball.y, ball.r, p.headX, p.headY, p.headR, c)) {
-    const impact = resolveBallContact(ball, c, 0.68, 0.5, p.vx, p.vy);
+    const impact = resolveBallContact(ball, c, 0.88, 0.5, p.vx, p.vy);
     if (impact > 0) {
       const rel = (ball.vx - p.vx) * c.nx + (ball.vy - p.vy) * c.ny;
       if (rel < HEADER_MIN_POP) {
@@ -134,12 +157,12 @@ export function ballVsPlayer(ball: Ball, p: Player, events: Emitter<GameEvents>)
 
   // Body: dead, soft contact (good for trapping the ball).
   if (circleCircle(ball.x, ball.y, ball.r, p.bodyX, p.bodyY, p.bodyR, c)) {
-    if (resolveBallContact(ball, c, 0.45, 0.4, p.vx, p.vy) > 0) registerTouch(ball, p, events);
+    if (resolveBallContact(ball, c, 0.5, 0.4, p.vx, p.vy) > 0) registerTouch(ball, p, events);
   }
 
   // Shoe at rest: lets you dribble and stop the ball.
   if (circleCircle(ball.x, ball.y, ball.r, p.footX, p.footY, p.footR, c)) {
-    if (resolveBallContact(ball, c, 0.32, 0.6, p.footVX, p.footVY) > 0) registerTouch(ball, p, events);
+    if (resolveBallContact(ball, c, 0.45, 0.6, p.footVX, p.footVY) > 0) registerTouch(ball, p, events);
   }
 }
 
@@ -149,6 +172,7 @@ export function ballVsPlayer(ball: Ball, p: Player, events: Emitter<GameEvents>)
  * why the ball can't be squeezed through a body.
  */
 export function separatePlayerFromBall(ball: Ball, p: Player): void {
+  if (ball.ghostT > 0) return;
   const shapes: Array<[number, number, number]> = [
     [p.headX, p.headY, p.headR],
     [p.bodyX, p.bodyY, p.bodyR],

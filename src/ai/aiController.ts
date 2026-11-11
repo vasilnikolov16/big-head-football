@@ -4,6 +4,7 @@ import type { Controller, PlayerIntent } from '../input/controls';
 import { Ball, makeImpactLog, stepBall } from '../physics/ball';
 import type { Match } from '../game/match';
 import type { Player } from '../game/player';
+import { inKickZone } from '../game/interactions';
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
@@ -37,7 +38,7 @@ interface Profile {
 const PROFILES: Record<Difficulty, Profile> = {
   easy: {
     think: 0.32,
-    lookahead: 0.45,
+    lookahead: 0.7,
     aimNoise: 60,
     speed: 0.68,
     headerChance: 0.3,
@@ -51,7 +52,7 @@ const PROFILES: Record<Difficulty, Profile> = {
   },
   medium: {
     think: 0.15,
-    lookahead: 0.9,
+    lookahead: 1.3,
     aimNoise: 22,
     speed: 0.88,
     headerChance: 0.65,
@@ -65,7 +66,7 @@ const PROFILES: Record<Difficulty, Profile> = {
   },
   hard: {
     think: 0.06,
-    lookahead: 1.4,
+    lookahead: 1.9,
     aimNoise: 4,
     speed: 1,
     headerChance: 0.95,
@@ -107,6 +108,9 @@ export class AIController implements Controller {
   private allowKick = true;
   private wantSuper = false;
   private wantDash = 0;
+  /** this attack: let the ball drop to the foot (kick / volley) rather than head it */
+  private footPlay = false;
+  private footRoll = 0;
   private sim = new Ball();
   private impacts = makeImpactLog();
   private path: PathPoint[] = [];
@@ -118,7 +122,7 @@ export class AIController implements Controller {
     public difficulty: Difficulty,
   ) {
     this.p = PROFILES[difficulty];
-    const maxPts = Math.ceil(1.5 / PRED_DT) + 2;
+    const maxPts = Math.ceil(2 / PRED_DT) + 2;
     for (let i = 0; i < maxPts; i++) this.path.push({ x: 0, y: 0, t: 0 });
   }
 
@@ -225,7 +229,24 @@ export class AIController implements Controller {
         break;
       }
     }
-    const aim = intercept ?? path[Math.max(0, n - 1)];
+    let aim = intercept ?? path[Math.max(0, n - 1)];
+
+    // Re-decide now and then whether to head the ball or let it drop to the foot.
+    this.footRoll -= this.p.think;
+    if (this.footRoll <= 0) {
+      this.footRoll = rand(0.9, 1.6);
+      this.footPlay = Math.random() > this.p.headerChance * 0.55;
+    }
+    // where the floating ball comes down to kicking height, if I can get there in time
+    if (this.footPlay && intercept && intercept.y < GROUND_Y - 110) {
+      for (let i = 0; i < n; i++) {
+        const pt = path[i];
+        if (pt.y < GROUND_Y - 95 || pt.t < intercept.t) continue;
+        const need = Math.abs(pt.x - f * offset - me.x) / (me.maxSpeed * this.p.speed);
+        if (need <= pt.t + 0.04 && u(pt.x) > u(me.x) - 40) aim = pt;
+        break;
+      }
+    }
 
     if (u(b.x) < u(me.x) - 12) {
       // The ball got past me: get goal-side again.
@@ -268,7 +289,7 @@ export class AIController implements Controller {
     // coarse kicking for the easy AI
     if (!this.p.preciseKick) {
       const rx = (b.x - me.x) * f;
-      if (rx > 5 && rx < 80 && b.y > GROUND_Y - 110 && this.allowKick) this.wantKick = true;
+      if (((rx > 5 && rx < 80 && b.y > GROUND_Y - 110) || inKickZone(b, me)) && this.allowKick) this.wantKick = true;
     }
   }
 
@@ -319,8 +340,9 @@ export class AIController implements Controller {
     const by = b.y + b.vy * lead + 0.5 * BALL_GRAVITY * lead * lead;
     const dx = bx - (me.hipX + me.facing * 19 + me.vx * lead);
     const dy = by - (me.hipY + 8);
-    const reach = b.r + me.footR + 9;
-    if (dx * dx + dy * dy > reach * reach) return false;
+    const reach = b.r + me.footR + 18;
+    const zone = inKickZone({ x: bx - me.vx * lead, y: by, r: b.r }, me);
+    if (dx * dx + dy * dy > reach * reach && !zone) return false;
     return (bx - me.x) * me.facing >= 0;
   }
 }

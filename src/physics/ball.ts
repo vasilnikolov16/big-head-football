@@ -12,11 +12,11 @@ import { circleRect, makeContact, type Contact } from './collide';
 
 /** Moment of inertia factor for a hollow sphere: I = k·m·r² */
 const INERTIA_K = 2 / 3;
-const MAGNUS = 0.0032;
-const AIR_DRAG_LINEAR = 0.12; // 1/s
-const AIR_DRAG_QUAD = 0.0001; // 1/px
+const MAGNUS = 0.0022;
+const AIR_DRAG_LINEAR = 0.3; // 1/s
+const AIR_DRAG_QUAD = 0.00018; // 1/px
 const ROLL_RESIST = 0.9; // 1/s, damping while rolling on the ground
-const ROLL_DECEL = 70; // px/s², constant rolling friction on grass
+const ROLL_DECEL = 60; // px/s², constant rolling friction on grass
 
 export class Ball {
   x = W / 2;
@@ -37,6 +37,10 @@ export class Ball {
   sinceTouch = 99;
   /** extra multipliers set by power-ups */
   gravityScale = 1;
+  /** 0 = no air drag (super shots fly exactly as designed) */
+  dragScale = 1;
+  /** seconds the ball passes through players (after a clash it must get out of the scrum) */
+  ghostT = 0;
   /** seconds the ball keeps burning (fire-ball power-up) */
   fireT = 0;
   fireOwner = -1;
@@ -50,6 +54,8 @@ export class Ball {
     this.sinceTouch = 99;
     this.fireT = 0;
     this.fireOwner = -1;
+    this.ghostT = 0;
+    this.dragScale = 1;
   }
 
   savePrev(): void {
@@ -84,7 +90,7 @@ export function resolveBallContact(
   const vn = rvx * c.nx + rvy * c.ny;
   if (vn >= 0) return 0;
   // Kill micro-bounces so the ball can come to rest.
-  const e = -vn < 45 ? 0 : restitution;
+  const e = -vn < 30 ? 0 : restitution;
   const jn = -(1 + e) * vn;
   b.vx += jn * c.nx;
   b.vy += jn * c.ny;
@@ -118,7 +124,7 @@ export function collideBallWorld(b: Ball, arena: Arena, impacts: ImpactLog, h: n
     tmp.nx = 0;
     tmp.ny = -1;
     tmp.pen = b.y + r - GROUND_Y;
-    const s = resolveBallContact(b, tmp, 0.74, 0.5);
+    const s = resolveBallContact(b, tmp, 0.86, 0.45);
     impacts.ground = Math.max(impacts.ground, s);
     b.grounded = true;
   }
@@ -127,29 +133,30 @@ export function collideBallWorld(b: Ball, arena: Arena, impacts: ImpactLog, h: n
     tmp.nx = 0;
     tmp.ny = 1;
     tmp.pen = r - b.y;
-    impacts.ceiling = Math.max(impacts.ceiling, resolveBallContact(b, tmp, 0.62, 0.3));
+    impacts.ceiling = Math.max(impacts.ceiling, resolveBallContact(b, tmp, 0.8, 0.3));
   }
   // Side walls (also the back of each goal)
   if (b.x - r < 0) {
     tmp.nx = 1;
     tmp.ny = 0;
     tmp.pen = r - b.x;
-    impacts.wall = Math.max(impacts.wall, resolveBallContact(b, tmp, 0.72, 0.3));
+    impacts.wall = Math.max(impacts.wall, resolveBallContact(b, tmp, 0.85, 0.3));
   } else if (b.x + r > W) {
     tmp.nx = -1;
     tmp.ny = 0;
     tmp.pen = b.x + r - W;
-    impacts.wall = Math.max(impacts.wall, resolveBallContact(b, tmp, 0.72, 0.3));
+    impacts.wall = Math.max(impacts.wall, resolveBallContact(b, tmp, 0.85, 0.3));
   }
   // Crossbars
   for (let i = 0; i < 2; i++) {
     const bar = arena.bars[i];
     if (!circleRect(b.x, b.y, r, bar, tmp)) continue;
-    impacts.bar = Math.max(impacts.bar, resolveBallContact(b, tmp, 0.76, 0.35));
+    impacts.bar = Math.max(impacts.bar, resolveBallContact(b, tmp, 0.85, 0.35));
     // A ball resting on top of the crossbar slides back into play.
     if (tmp.ny < -0.7) {
       const towardField = i === 0 ? 1 : -1;
-      b.vx += towardField * 700 * h;
+      b.vx += towardField * 1800 * h;
+      if (b.vx * towardField < 120) b.vx = towardField * 120;
       b.grounded = true;
     }
   }
@@ -166,7 +173,7 @@ export function stepBall(b: Ball, arena: Arena, dt: number, impacts: ImpactLog):
     let ax = -MAGNUS * b.spin * b.vy;
     let ay = BALL_GRAVITY * b.gravityScale + MAGNUS * b.spin * b.vx;
     // Air drag (linear + quadratic)
-    const drag = AIR_DRAG_LINEAR + AIR_DRAG_QUAD * v;
+    const drag = (AIR_DRAG_LINEAR + AIR_DRAG_QUAD * v) * b.dragScale;
     ax -= b.vx * drag;
     ay -= b.vy * drag;
     b.vx += ax * h;
@@ -193,4 +200,5 @@ export function stepBall(b: Ball, arena: Arena, dt: number, impacts: ImpactLog):
   b.spin = clamp(b.spin, -60, 60);
   b.sinceTouch += dt;
   b.fireT = Math.max(0, b.fireT - dt);
+  b.ghostT = Math.max(0, b.ghostT - dt);
 }

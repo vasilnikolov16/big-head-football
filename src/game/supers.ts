@@ -97,6 +97,7 @@ export class SuperShot {
     this.holdY = Math.max(p.headY - p.headR * 0.3, Math.min(p.y - b.r - 22, b.y));
     b.vx = b.vy = 0;
     b.gravityScale = 0;
+    b.dragScale = 0; // super shots fly exactly as designed
   }
 
   private windup(m: Match, dt: number): void {
@@ -429,6 +430,7 @@ export class SuperShot {
     this.done = true;
     this.hidden = false;
     m.ball.gravityScale = 1;
+    m.ball.dragScale = 1;
   }
 }
 
