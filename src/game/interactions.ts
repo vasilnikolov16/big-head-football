@@ -12,9 +12,9 @@ const HEADER_MAX = 430;
 const KICK_REACH_BONUS = 13;
 const KICK_ACTIVE_FROM = 0.18;
 // super energy gained per action (1 = full bar)
-const ENERGY_TOUCH = 0.018;
-const ENERGY_KICK = 0.04;
-const ENERGY_HEADER = 0.015;
+const ENERGY_TOUCH = 0.009;
+const ENERGY_KICK = 0.022;
+const ENERGY_HEADER = 0.008;
 const KICK_SWEET = 0.42;
 
 export interface KickResult {

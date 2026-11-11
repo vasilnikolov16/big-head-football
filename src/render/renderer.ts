@@ -1,5 +1,5 @@
 import { FONT_DISPLAY, FONT_TEXT, H, INK, W } from '../core/constants';
-import { lerp } from '../core/math';
+import { clamp, lerp } from '../core/math';
 import { t as tx } from '../i18n/i18n';
 import { drawBall, drawBallShadow } from './ballDraw';
 import { Fx } from './fx';
@@ -97,6 +97,20 @@ export class Renderer {
     const sy = fx.shake > 0 ? (Math.random() * 2 - 1) * fx.shake * 0.7 : 0;
     ctx.setTransform(this.scale, 0, 0, this.scale, sx * this.scale, sy * this.scale);
 
+    // super-shot cinematic: zoom the camera on the shooter
+    const cin = fx.cinematic;
+    let focusX = 0;
+    let focusY = 0;
+    if (cin.active) {
+      const sp = m.players[cin.side];
+      focusX = lerp(sp.px, sp.x, alpha);
+      focusY = sp.headY + (lerp(sp.py, sp.y, alpha) - sp.y);
+      const z = cin.zoom();
+      ctx.translate(focusX, focusY);
+      ctx.scale(z, z);
+      ctx.translate(-focusX, -focusY);
+    }
+
     const st = this.stadium;
     st.drawBackground(ctx);
     st.drawCrowd(ctx, t);
@@ -123,8 +137,10 @@ export class Renderer {
     if (!hidden) drawBallShadow(ctx, bx, by, br);
 
     drawPowerItems(ctx, m.powerups.items, alpha, t);
+    this.drawArmBursts(ctx, m, t, true);
     drawPlayer(ctx, m.players[0], alpha, t);
     drawPlayer(ctx, m.players[1], alpha, t);
+    this.drawArmBursts(ctx, m, t, false);
 
     const fire = b.fireT > 0;
     const glow = opts.replayGlow ?? null;
@@ -141,6 +157,7 @@ export class Renderer {
 
     drawCrossbar(ctx, 0, m.arena, fx.barFlash[0]);
     drawCrossbar(ctx, 1, m.arena, fx.barFlash[1]);
+    if (cin.active) cin.drawWorld(ctx, focusX, focusY, t);
 
     // HUD does not shake
     ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0);
@@ -150,10 +167,11 @@ export class Renderer {
     }
     if (replay) this.drawReplayOverlay(ctx, opts.replayT ?? 0);
     else if (opts.hud) {
-      sfx.drawCallout(ctx, m);
+      if (!cin.active) sfx.drawCallout(ctx, m);
       drawHud(ctx, m, t);
       if (m.banner) drawBanner(ctx, m.banner);
     }
+    cin.drawScreen(ctx, t);
 
     if (this.showFps) {
       ctx.font = `14px ${FONT_TEXT}`;
@@ -161,6 +179,42 @@ export class Renderer {
       ctx.textBaseline = 'top';
       ctx.fillStyle = this.fps >= 58 ? '#7cff6b' : '#ff6b6b';
       ctx.fillText(`${this.fps.toFixed(0)} FPS`, 10, H - 24);
+    }
+  }
+
+  /** Rings collapsing into the player + a light pillar when the super is armed. */
+  private drawArmBursts(ctx: CanvasRenderingContext2D, m: RenderView, t: number, behind: boolean): void {
+    for (const b of this.fx.armBursts) {
+      const p = m.players[b.player];
+      const k = b.t / 0.7;
+      const cx = p.x;
+      const cy = p.headY;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      if (behind) {
+        // pillar of light
+        const w = 120 * (1 - k * 0.6);
+        const g = ctx.createLinearGradient(cx - w / 2, 0, cx + w / 2, 0);
+        g.addColorStop(0, b.color + '00');
+        g.addColorStop(0.5, b.color + 'aa');
+        g.addColorStop(1, b.color + '00');
+        ctx.globalAlpha = 1 - k;
+        ctx.fillStyle = g;
+        ctx.fillRect(cx - w / 2, -20, w, p.y + 20);
+      } else {
+        for (let i = 0; i < 3; i++) {
+          const rk = clamp(k * 1.4 - i * 0.18, 0, 1);
+          if (rk <= 0 || rk >= 1) continue;
+          ctx.strokeStyle = i === 1 ? '#ffffff' : b.color;
+          ctx.globalAlpha = rk;
+          ctx.lineWidth = 6 * (1 - rk) + 2;
+          ctx.beginPath();
+          ctx.arc(cx, cy, (1 - rk) * 170 + p.headR * 0.8, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        void t;
+      }
+      ctx.restore();
     }
   }
 

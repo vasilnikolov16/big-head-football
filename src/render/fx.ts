@@ -2,6 +2,7 @@ import { GROUND_Y } from '../core/constants';
 import type { Match } from '../game/match';
 import { SUPER_INFO } from '../game/supers';
 import type { NetState } from './goals';
+import { SuperCinematic } from './cinematic';
 import { Particles } from './particles';
 import type { Stadium } from './stadium';
 
@@ -23,17 +24,22 @@ export class Fx {
   barFlash: [number, number] = [0, 0];
   readonly particles = new Particles();
   trail: TrailPt[] = [];
+  readonly cinematic = new SuperCinematic();
+  /** power-up bursts when a player arms the super shot */
+  armBursts: Array<{ player: number; t: number; color: string }> = [];
   private unsub: Array<() => void> = [];
 
   constructor(private stadium: Stadium) {}
 
-  attach(m: Match): void {
+  /** cinematic: play the super-shot cut-in (off for the silent menu demo) */
+  attach(m: Match, cinematic = true): void {
     this.detach();
     this.nets = [null, null];
     this.shake = 0;
     this.flash = 0;
     this.hitStop = 0;
     this.trail = [];
+    this.armBursts = [];
     this.particles.clear();
     const st = this.stadium;
     const ev = m.events;
@@ -80,11 +86,19 @@ export class Fx {
       ev.on('jump', (e) => this.particles.dust(e.x, 0.3)),
       ev.on('superShot', (e) => {
         const color = SUPER_INFO[e.id as keyof typeof SUPER_INFO]?.color ?? '#ffffff';
-        this.addShake(10);
-        this.hitStop = Math.max(this.hitStop, 0.12);
-        this.particles.sparks(e.x, e.y, 28, color, 800);
-        this.particles.stars(e.x, e.y, 8, color);
-        st.excitement = Math.max(st.excitement, 0.6);
+        this.addShake(12);
+        this.particles.sparks(e.x, e.y, 40, color, 900);
+        this.particles.stars(e.x, e.y, 14, color);
+        if (cinematic) this.cinematic.start(e.player as 0 | 1, m.players[e.player].char);
+        st.excitement = Math.max(st.excitement, 0.8);
+      }),
+      ev.on('superArmed', (e) => {
+        const p = m.players[e.player];
+        const color = SUPER_INFO[p.char.super].color;
+        this.armBursts.push({ player: e.player, t: 0, color });
+        this.particles.stars(p.headX, p.headY, 10, color);
+        this.particles.sparks(p.x, p.y - 40, 18, color, 500);
+        this.addShake(4);
       }),
       ev.on('superHit', (e) => {
         this.addShake(6);
@@ -140,6 +154,9 @@ export class Fx {
   update(dt: number): void {
     this.shake = Math.max(0, this.shake - dt * 40);
     this.flash = Math.max(0, this.flash - dt * 2.2);
+    this.cinematic.update(dt);
+    for (const b of this.armBursts) b.t += dt;
+    this.armBursts = this.armBursts.filter((b) => b.t < 0.7);
     this.particles.update(dt);
     for (let i = 0; i < 2; i++) {
       const n = this.nets[i];

@@ -43,6 +43,8 @@ const KICKOFF_TIME = 1.1;
 const GOAL_TIME = 2.6;
 const BALL_DROP_Y = 170;
 const KICKOFF_SHIFT = 90;
+/** super energy gained per second just by playing (like the classic power gauge) */
+const ENERGY_PER_SEC = 1 / 26;
 
 export class Match {
   readonly events = new Emitter<GameEvents>();
@@ -158,6 +160,9 @@ export class Match {
       const intent = this.intents[i];
       const ctrl = this.controllers[i];
       if (ctrl) ctrl.read(intent);
+      // super shots can only be charged, armed and fired in open play (not after a goal)
+      p.superLocked = this.phase !== 'playing';
+      if (this.phase === 'playing') p.addEnergy(dt * ENERGY_PER_SEC);
       p.update(dt, controllable && ctrl ? intent : this.idle, this.arena, this.events);
     }
     playerVsPlayer(this.players[0], this.players[1]);
@@ -225,7 +230,7 @@ export class Match {
       ballVsPlayer(b, p, this.events);
       const touched = b.lastTouch === p.index && b.sinceTouch === 0 && !touchedBefore;
       if (touched) {
-        if (p.charged) this.fireSuper(p);
+        if (p.charged && this.phase === 'playing') this.fireSuper(p);
         else if (sup && !sup.done) sup.finish(this); // blocked or touched again
       }
     }

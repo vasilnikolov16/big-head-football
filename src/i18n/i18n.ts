@@ -126,8 +126,8 @@ const S: Record<string, [string, string]> = {
     'Kicks are strongest if you press just before the ball reaches your foot. A late kick lobs the ball high.',
   ],
   'howto.tip2': [
-    'Докосвай топката, за да пълниш лентата. Пълна лента → супер бутона → следващото докосване изстрелва супер удара.',
-    'Touch the ball to fill your bar. Full bar → super button → your next touch fires the super shot.',
+    'Лентата за супер удар се пълни сама с времето и по-бързо, когато докосваш топката. Пълна лента → супер бутона → героят светва и следващото му докосване изстрелва удара. Зареденият удар остава и след гол, но не може да се ползва, докато се празнува гол.',
+    'The super bar fills by itself over time and faster when you touch the ball. Full bar → super button → your hero glows and the next touch fires the shot. An armed shot stays armed after a goal, but it can’t be used during goal celebrations.',
   ],
   'howto.tip3': ['Удряй бонусите с топката (или ги докосни), за да ги вземеш.', 'Hit power-ups with the ball (or touch them) to collect them.'],
   'howto.tip4': ['При равенство след края на времето — златен гол: следващият печели.', 'A draw at full time means golden goal: next goal wins.'],

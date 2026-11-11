@@ -161,7 +161,6 @@ export class PowerUps {
         break;
       case 'freeze':
         target.frozenT = info.duration;
-        target.charged = false;
         target.setExpression('shock', info.duration);
         break;
       case 'bigHead':

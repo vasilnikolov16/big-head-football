@@ -139,7 +139,7 @@ export class Game implements AppActions {
     }
     this.match = m;
     const demo = setup.mode === 'demo';
-    this.renderer.fx.attach(m);
+    this.renderer.fx.attach(m, !demo);
     // the menu background match is silent: only the light menu music plays
     if (demo) this.gameAudio.detach();
     else this.gameAudio.attach(m);
@@ -362,7 +362,8 @@ export class Game implements AppActions {
         // hit-stop: freeze the simulation for a few frames on big impacts
         fx.hitStop = Math.max(0, fx.hitStop - dtReal);
       } else {
-        this.acc += dtReal * this.timeScale;
+        // super-shot cinematic slows the game down for a moment
+        this.acc += dtReal * this.timeScale * fx.cinematic.timeFactor();
         while (this.acc >= DT) {
           this.match.step(DT);
           this.recorder.record(this.match);

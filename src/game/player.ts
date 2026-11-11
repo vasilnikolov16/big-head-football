@@ -19,7 +19,6 @@ const BODY_UP = 40;
 const NECK_UP = 56;
 
 const COYOTE = 0.09;
-const SUPER_CHARGE_TIME = 4;
 const JUMP_BUFFER = 0.13;
 
 export interface PlayerMatchStats {
@@ -67,9 +66,12 @@ export class Player {
   // super shot
   /** 0..1, fills when touching the ball */
   energy = 0;
-  /** super is armed: the next touch of the ball fires it */
+  /** super is armed (claimed): the next touch of the ball fires it. Stays armed across goals. */
   charged = false;
+  /** seconds since the super was armed (arming animation) */
   chargeT = 0;
+  /** set by the match: no charging or arming outside open play (e.g. after a goal) */
+  superLocked = false;
 
   // status effects
   stunT = 0;
@@ -169,7 +171,7 @@ export class Player {
   }
 
   addEnergy(v: number): void {
-    if (this.charged) return;
+    if (this.charged || this.superLocked) return;
     const before = this.energy;
     this.energy = Math.min(1, this.energy + v);
     if (before < 1 && this.energy >= 1) this.energyFullT = 0;
@@ -189,16 +191,13 @@ export class Player {
     const frozen = this.frozenT > 0 || this.stunT > 0;
 
     // --- arm the super shot ---
-    if (!frozen && intent.superPressed && this.energy >= 1 && !this.charged) {
+    if (!frozen && !this.superLocked && intent.superPressed && this.energy >= 1 && !this.charged) {
       this.charged = true;
-      this.chargeT = SUPER_CHARGE_TIME;
+      this.chargeT = 0;
       this.setExpression('effort', 0.6);
       events.emit('superArmed', { player: this.index });
     }
-    if (this.charged) {
-      this.chargeT -= dt;
-      if (this.chargeT <= 0) this.charged = false; // fizzles, energy is kept
-    }
+    if (this.charged) this.chargeT += dt;
     this.energyFullT += dt;
     let move = frozen ? 0 : intent.move;
     if (this.reversedT > 0) move = -move;

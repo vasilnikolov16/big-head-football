@@ -371,7 +371,6 @@ export class SuperShot {
     this.hitOpponent = true;
     p.stunT = Math.max(p.stunT, seconds);
     p.setExpression('shock', seconds);
-    p.charged = false;
     m.events.emit('superHit', { player: p.index, x: p.headX, y: p.headY });
   }
 
