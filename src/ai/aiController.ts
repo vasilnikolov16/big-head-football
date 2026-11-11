@@ -28,6 +28,8 @@ interface Profile {
   kickChance: number;
   /** chance to hop over a ball that is behind it instead of shoving it into its own goal */
   jumpOver: number;
+  /** chance per decision to arm the super shot when it is ready and the ball is close */
+  superUse: number;
 }
 
 const PROFILES: Record<Difficulty, Profile> = {
@@ -42,6 +44,7 @@ const PROFILES: Record<Difficulty, Profile> = {
     preciseKick: false,
     kickChance: 0.4,
     jumpOver: 0.2,
+    superUse: 0.25,
   },
   medium: {
     think: 0.15,
@@ -54,6 +57,7 @@ const PROFILES: Record<Difficulty, Profile> = {
     preciseKick: true,
     kickChance: 0.7,
     jumpOver: 0.6,
+    superUse: 0.6,
   },
   hard: {
     think: 0.06,
@@ -66,6 +70,7 @@ const PROFILES: Record<Difficulty, Profile> = {
     preciseKick: true,
     kickChance: 1,
     jumpOver: 1,
+    superUse: 1,
   },
 };
 
@@ -95,6 +100,7 @@ export class AIController implements Controller {
   private kickCd = 0;
   private wantKick = false;
   private allowKick = true;
+  private wantSuper = false;
   private sim = new Ball();
   private impacts = makeImpactLog();
   private path: PathPoint[] = [];
@@ -145,7 +151,8 @@ export class AIController implements Controller {
     }
     out.kickPressed = kick && this.kickCd <= 0 && !me.kicking;
     if (out.kickPressed) this.kickCd = 0.25;
-    out.superPressed = false;
+    out.superPressed = this.wantSuper && me.energy >= 1 && !me.charged;
+    if (out.superPressed) this.wantSuper = false;
   }
 
   // ------------------------------------------------------------ prediction
@@ -241,6 +248,13 @@ export class AIController implements Controller {
     this.targetX = clamp(this.targetX + rand(-1, 1) * this.p.aimNoise, me.halfW, W - me.halfW);
 
     this.considerHeader(n);
+
+    // Arm the super when the ball is about to be played (in front of me and close).
+    if (me.energy >= 1 && !me.charged) {
+      const rx = (b.x - me.x) * f;
+      const close = rx > -10 && rx < 170 && Math.abs(b.y - me.headY) < 260;
+      if (close && Math.random() < this.p.superUse) this.wantSuper = true;
+    }
 
     // coarse kicking for the easy AI
     if (!this.p.preciseKick) {

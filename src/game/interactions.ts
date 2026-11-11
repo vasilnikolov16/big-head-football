@@ -11,6 +11,10 @@ const HEADER_FORWARD = 140;
 const HEADER_MAX = 430;
 const KICK_REACH_BONUS = 13;
 const KICK_ACTIVE_FROM = 0.18;
+// super energy gained per action (1 = full bar)
+const ENERGY_TOUCH = 0.018;
+const ENERGY_KICK = 0.04;
+const ENERGY_HEADER = 0.015;
 const KICK_SWEET = 0.42;
 
 export interface KickResult {
@@ -25,6 +29,7 @@ function registerTouch(ball: Ball, p: Player, events: Emitter<GameEvents>): void
   if (p.touchCooldown <= 0) {
     p.touchCooldown = 0.18;
     p.stats.touches++;
+    p.addEnergy(ENERGY_TOUCH);
     events.emit('touch', { player: p.index });
   }
 }
@@ -63,6 +68,7 @@ function tryKick(ball: Ball, p: Player, events: Emitter<GameEvents>): boolean {
   }
   p.kickHit = true;
   p.stats.shots++;
+  p.addEnergy(ENERGY_KICK * (0.5 + sweet));
   p.setExpression('effort', 0.35);
   registerTouch(ball, p, events);
   events.emit('kick', { player: p.index, x: ball.x, y: ball.y, speed, sweet });
@@ -99,6 +105,7 @@ export function ballVsPlayer(ball: Ball, p: Player, events: Emitter<GameEvents>)
       registerTouch(ball, p, events);
       if (impact > 160) {
         p.stats.headers++;
+        p.addEnergy(ENERGY_HEADER);
         events.emit('header', { player: p.index, x: ball.x, y: ball.y, speed: impact });
       }
     }

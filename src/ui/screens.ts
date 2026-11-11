@@ -14,7 +14,7 @@ export interface AppActions {
   showCpuSetup(): void;
   showHowTo(back: () => void): void;
   showSettings(back: () => void): void;
-  startCpu(): void;
+  showHeroSelect(mode: 'cpu' | 'pvp'): void;
   startPvp(): void;
   rematch(): void;
   changeHeroes(): void;
@@ -114,7 +114,7 @@ export function cpuSetup(app: AppActions): Screen {
           : 'Безмилостен: предвижда всичко, засича ударите с глава и не прощава.';
   };
   updateDesc();
-  const start = button('Започни мача', () => app.startCpu(), 'btn btn-go');
+  const start = button('Избери герой ▸', () => app.showHeroSelect('cpu'), 'btn btn-go');
   const back = button('Назад', () => app.showMain(), 'btn btn-alt btn-small');
   body.append(diff.el, desc, ctrl.el, dur.el, h('div', 'row-buttons', undefined, [start.el, back.el]));
   return { id: 'cpu', root, items: [diff, ctrl, dur, start, back], back: () => app.showMain(), initial: 3 };

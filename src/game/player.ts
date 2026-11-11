@@ -19,6 +19,7 @@ const BODY_UP = 40;
 const NECK_UP = 56;
 
 const COYOTE = 0.09;
+const SUPER_CHARGE_TIME = 4;
 const JUMP_BUFFER = 0.13;
 
 export interface PlayerMatchStats {
@@ -63,7 +64,15 @@ export class Player {
   footVY = 0;
   readonly footR = 11;
 
-  // status effects (power-ups use these later)
+  // super shot
+  /** 0..1, fills when touching the ball */
+  energy = 0;
+  /** super is armed: the next touch of the ball fires it */
+  charged = false;
+  chargeT = 0;
+
+  // status effects
+  stunT = 0;
   frozenT = 0;
   reversedT = 0;
   jumpBoostT = 0;
@@ -157,8 +166,38 @@ export class Player {
     this.exprT = duration;
   }
 
+  addEnergy(v: number): void {
+    if (this.charged) return;
+    const before = this.energy;
+    this.energy = Math.min(1, this.energy + v);
+    if (before < 1 && this.energy >= 1) this.energyFullT = 0;
+  }
+
+  /** time since the energy bar became full (for HUD flashing) */
+  energyFullT = 0;
+
+  /** Place the player for menus/previews without physics. */
+  placeAt(x: number, y: number): void {
+    this.x = this.px = x;
+    this.y = this.py = y;
+    this.updateFoot(0);
+  }
+
   update(dt: number, intent: PlayerIntent, arena: Arena, events: Emitter<GameEvents>): void {
-    const frozen = this.frozenT > 0;
+    const frozen = this.frozenT > 0 || this.stunT > 0;
+
+    // --- arm the super shot ---
+    if (!frozen && intent.superPressed && this.energy >= 1 && !this.charged) {
+      this.charged = true;
+      this.chargeT = SUPER_CHARGE_TIME;
+      this.setExpression('effort', 0.6);
+      events.emit('superArmed', { player: this.index });
+    }
+    if (this.charged) {
+      this.chargeT -= dt;
+      if (this.chargeT <= 0) this.charged = false; // fizzles, energy is kept
+    }
+    this.energyFullT += dt;
     let move = frozen ? 0 : intent.move;
     if (this.reversedT > 0) move = -move;
 
@@ -212,11 +251,18 @@ export class Player {
     this.updateFoot(dt);
 
     // --- timers & animation ---
+    this.stunT = Math.max(0, this.stunT - dt);
     this.frozenT = Math.max(0, this.frozenT - dt);
     this.reversedT = Math.max(0, this.reversedT - dt);
     this.jumpBoostT = Math.max(0, this.jumpBoostT - dt);
     this.touchCooldown = Math.max(0, this.touchCooldown - dt);
     this.squash = approach(this.squash, 0, dt * 1.6);
+    this.tickAnimation(dt);
+    if (this.grounded && Math.abs(this.vx) > 30) this.runPhase += dt * (Math.abs(this.vx) / 22);
+  }
+
+  /** Blinking and expression timers (also used by the hero-select previews). */
+  tickAnimation(dt: number): void {
     if (this.exprT > 0) {
       this.exprT -= dt;
       if (this.exprT <= 0) this.expr = 'idle';
@@ -227,7 +273,6 @@ export class Player {
       this.blinkT = rand(2, 5);
     }
     this.blink = Math.max(0, this.blink - dt);
-    if (this.grounded && Math.abs(this.vx) > 30) this.runPhase += dt * (Math.abs(this.vx) / 22);
   }
 
   private collideWorld(arena: Arena, events: Emitter<GameEvents>): void {
@@ -277,7 +322,7 @@ export class Player {
     }
   }
 
-  private updateFoot(dt: number): void {
+  updateFoot(dt: number): void {
     let a = KICK_REST_ANGLE;
     if (this.kickT >= 0) {
       if (this.kickT < KICK_FWD) {

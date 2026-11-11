@@ -48,7 +48,69 @@ function plate(ctx: CanvasRenderingContext2D, side: 0 | 1, color: string, name: 
   ctx.restore();
 }
 
+/** Super energy bar under a name plate. */
+function energyBar(ctx: CanvasRenderingContext2D, m: Match, side: 0 | 1, t: number): void {
+  const p = m.players[side];
+  const dir = side === 0 ? -1 : 1;
+  const inner = W / 2 + dir * 100;
+  const outer = W / 2 + dir * 300;
+  const x0 = Math.min(inner, outer);
+  const w = Math.abs(outer - inner);
+  const y = 64;
+  const h = 14;
+  const full = p.energy >= 1;
+  ctx.save();
+  ctx.fillStyle = 'rgba(12,10,32,0.85)';
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.roundRect(x0 - 2, y - 2, w + 4, h + 4, 8);
+  ctx.fill();
+  ctx.stroke();
+  const fw = w * Math.min(1, p.energy);
+  // fill grows from the centre outwards
+  const fx = side === 0 ? x0 + w - fw : x0;
+  if (fw > 0) {
+    const g = ctx.createLinearGradient(x0, 0, x0 + w, 0);
+    const c = p.char.look.shirt === '#ffffff' ? '#ff4d6d' : p.char.look.shirt;
+    if (full) {
+      g.addColorStop(0, '#ffd23f');
+      g.addColorStop(0.5, '#fff3a0');
+      g.addColorStop(1, '#ffd23f');
+    } else {
+      g.addColorStop(0, c);
+      g.addColorStop(1, '#ffd23f');
+    }
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.roundRect(fx, y, fw, h, 6);
+    ctx.fill();
+    // shine sweep
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fillRect(fx, y + 2, fw, 3);
+  }
+  if (full || p.charged) {
+    const pulse = 0.5 + 0.5 * Math.sin(t * (p.charged ? 18 : 7));
+    ctx.shadowColor = '#ffd23f';
+    ctx.shadowBlur = 10 + pulse * 14;
+    ctx.strokeStyle = p.charged ? '#ffffff' : '#ffd23f';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.roundRect(x0 - 2, y - 2, w + 4, h + 4, 8);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.font = `12px ${FONT_DISPLAY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = INK;
+    ctx.fillText(p.charged ? 'ЗАРЕДЕН — ДОКОСНИ ТОПКАТА!' : 'СУПЕР УДАР — ГОТОВ!', x0 + w / 2, y + h / 2 + 1);
+  }
+  ctx.restore();
+}
+
 export function drawHud(ctx: CanvasRenderingContext2D, m: Match, t: number): void {
+  energyBar(ctx, m, 0, t);
+  energyBar(ctx, m, 1, t);
   plate(ctx, 0, m.players[0].char.look.shirt, m.config.names[0], m.config.tags[0]);
   plate(ctx, 1, m.players[1].char.look.shirt, m.config.names[1], m.config.tags[1]);
 

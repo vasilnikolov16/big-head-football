@@ -7,6 +7,7 @@ import { drawCrossbar, drawGoalBack } from './goals';
 import { drawBanner, drawHud } from './hud';
 import { drawPlayer, drawPlayerShadow } from './playerDraw';
 import { Stadium } from './stadium';
+import { SuperFx } from './superFx';
 
 export interface RenderOptions {
   /** scoreboard + banners (hidden for the menu background match) */
@@ -18,6 +19,8 @@ export class Renderer {
   readonly ctx: CanvasRenderingContext2D;
   readonly stadium = new Stadium();
   readonly fx = new Fx();
+  readonly superFx = new SuperFx();
+  private lastDt = 0;
   scale = 1;
   cssScale = 1;
   showFps = false;
@@ -59,6 +62,7 @@ export class Renderer {
   }
 
   update(dtReal: number): void {
+    this.lastDt = dtReal;
     this.fx.update(dtReal);
     this.stadium.update(dtReal);
     this.fpsAcc += dtReal;
@@ -100,13 +104,22 @@ export class Renderer {
     const by = lerp(b.py, b.y, alpha);
     const ba = lerp(b.pangle, b.angle, alpha);
 
+    const sfx = this.superFx;
+    sfx.update(m, this.lastDt, bx, by);
+    this.lastDt = 0;
+    const hidden = m.superShot?.hidden ?? false;
+    const br = b.r * sfx.ballScale(m);
+
     drawPlayerShadow(ctx, m.players[0], alpha);
     drawPlayerShadow(ctx, m.players[1], alpha);
-    drawBallShadow(ctx, bx, by, b.r);
+    if (!hidden) drawBallShadow(ctx, bx, by, br);
 
     drawPlayer(ctx, m.players[0], alpha, t);
     drawPlayer(ctx, m.players[1], alpha, t);
-    drawBall(ctx, bx, by, b.r, ba);
+    sfx.drawBack(ctx, t);
+    sfx.drawDecoys(ctx, m, alpha);
+    if (!hidden) drawBall(ctx, bx, by, br, ba);
+    sfx.drawFront(ctx, m, bx, by, br, t);
 
     drawCrossbar(ctx, 0, m.arena, fx.barFlash[0]);
     drawCrossbar(ctx, 1, m.arena, fx.barFlash[1]);
@@ -114,6 +127,7 @@ export class Renderer {
     // HUD does not shake
     ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0);
     if (opts.hud) {
+      sfx.drawCallout(ctx, m);
       drawHud(ctx, m, t);
       if (m.banner) drawBanner(ctx, m.banner);
     }

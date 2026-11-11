@@ -23,6 +23,21 @@ const BLOCKED = new Set([
   'Backspace',
 ]);
 
+/**
+ * Some environments (remote desktops, a few browsers/automation tools) send an
+ * empty `code`; derive it from `key` + `location` so controls still work.
+ */
+function codeOf(e: KeyboardEvent): string {
+  if (e.code) return e.code;
+  const k = e.key;
+  if (k === 'Shift') return e.location === 2 ? 'ShiftRight' : 'ShiftLeft';
+  if (k === 'Enter') return e.location === 3 ? 'NumpadEnter' : 'Enter';
+  if (k === ' ') return 'Space';
+  if (k.startsWith('Arrow') || k === 'Escape' || k === 'Backspace' || k === 'Tab') return k;
+  if (/^[a-z]$/i.test(k)) return 'Key' + k.toUpperCase();
+  return k;
+}
+
 export class Keyboard {
   private down = new Map<string, number>();
   private presses = new Map<string, number>();
@@ -39,16 +54,18 @@ export class Keyboard {
   }
 
   private onDown = (e: KeyboardEvent): void => {
-    if (BLOCKED.has(e.code)) e.preventDefault();
+    const code = codeOf(e);
+    if (BLOCKED.has(code)) e.preventDefault();
     if (e.repeat) return;
-    if (!this.down.has(e.code)) this.down.set(e.code, ++this.seq);
-    this.presses.set(e.code, performance.now());
-    for (const fn of this.listeners) fn(e.code);
+    if (!this.down.has(code)) this.down.set(code, ++this.seq);
+    this.presses.set(code, performance.now());
+    for (const fn of this.listeners) fn(code);
   };
 
   private onUp = (e: KeyboardEvent): void => {
-    if (BLOCKED.has(e.code)) e.preventDefault();
-    this.down.delete(e.code);
+    const code = codeOf(e);
+    if (BLOCKED.has(code)) e.preventDefault();
+    this.down.delete(code);
   };
 
   reset = (): void => {

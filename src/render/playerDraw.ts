@@ -1,7 +1,9 @@
 import { GROUND_Y, INK } from '../core/constants';
 import { clamp, lerp } from '../core/math';
-import type { Expression, HeadDraw } from '../game/characters';
+import type { Expression, FaceStyle } from '../game/characters';
 import type { Player } from '../game/player';
+import { SUPER_INFO } from '../game/supers';
+import { HERO_ART, type HeadDraw } from './heroArt';
 
 export function drawPlayerShadow(ctx: CanvasRenderingContext2D, p: Player, alpha: number): void {
   const x = lerp(p.px, p.x, alpha);
@@ -53,22 +55,84 @@ function shoe(ctx: CanvasRenderingContext2D, x: number, y: number, rot: number, 
   ctx.restore();
 }
 
+function shade(hex: string, k = 0.75): string {
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.floor(((n >> 16) & 255) * k);
+  const g = Math.floor(((n >> 8) & 255) * k);
+  const b = Math.floor((n & 255) * k);
+  return `rgb(${r},${g},${b})`;
+}
+
+function lighten(hex: string): string {
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.min(255, ((n >> 16) & 255) + 40);
+  const g = Math.min(255, ((n >> 8) & 255) + 40);
+  const b = Math.min(255, (n & 255) + 40);
+  return `rgb(${r},${g},${b})`;
+}
+
+/** Glow around a player whose super shot is armed. */
+function drawAura(ctx: CanvasRenderingContext2D, p: Player, t: number): void {
+  const color = SUPER_INFO[p.char.super].color;
+  const cy = (p.headY - p.y) * 0.75;
+  const pulse = 1 + Math.sin(t * 12) * 0.06;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const g = ctx.createRadialGradient(0, cy, 10, 0, cy, p.headR * 2.1 * pulse);
+  g.addColorStop(0, color + '66');
+  g.addColorStop(0.6, color + '22');
+  g.addColorStop(1, color + '00');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(0, cy, p.headR * 2.1 * pulse, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = color;
+  for (let i = 0; i < 6; i++) {
+    const a = t * 3 + (i / 6) * Math.PI * 2;
+    const r = p.headR * 1.5;
+    const s = 2.5 + Math.sin(t * 8 + i) * 1.2;
+    ctx.beginPath();
+    ctx.arc(Math.cos(a) * r, cy + Math.sin(a) * r * 0.9, s, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function star(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, rot: number): void {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = rot + (i / 10) * Math.PI * 2;
+    const rr = i % 2 ? r * 0.45 : r;
+    ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  ctx.closePath();
+}
+
+
 export function drawPlayer(ctx: CanvasRenderingContext2D, p: Player, alpha: number, t: number): void {
   const x = lerp(p.px, p.x, alpha);
   const y = lerp(p.py, p.y, alpha);
   const f = p.facing;
   const L = p.char.look;
+  const art = HERO_ART[p.char.id] ?? {};
   const s = p.squash;
   const running = p.grounded && Math.abs(p.vx) > 40;
   const swing = running ? Math.sin(p.runPhase) : 0;
+  const arms = L.arms ?? L.skin;
 
   ctx.save();
   ctx.translate(x, y);
+  if (p.charged) drawAura(ctx, p, t);
   // squash & stretch around the feet
   ctx.scale(1 + s * 0.45, 1 - s * 0.45);
-
-  // frozen tint (power-up later)
   if (p.frozenT > 0) ctx.filter = 'hue-rotate(160deg) saturate(1.4) brightness(1.15)';
+
+  if (art.bodyBack) {
+    ctx.save();
+    ctx.scale(f, 1);
+    art.bodyBack({ ctx, t });
+    ctx.restore();
+  }
 
   // --- back leg
   const hipY = -25;
@@ -79,7 +143,7 @@ export function drawPlayer(ctx: CanvasRenderingContext2D, p: Player, alpha: numb
 
   // --- back arm
   const armSwing = running ? swing * 5 : Math.sin(t * 2.4 + p.index) * 1.2;
-  limb(ctx, -f * 12, -48, -f * 16 - armSwing * f, -34, L.skin, 6);
+  limb(ctx, -f * 12, -48, -f * 16 - armSwing * f, -34, arms, 6);
 
   // --- shorts
   ctx.lineWidth = 3;
@@ -97,12 +161,16 @@ export function drawPlayer(ctx: CanvasRenderingContext2D, p: Player, alpha: numb
   ctx.stroke();
   ctx.fillStyle = L.shirtTrim;
   ctx.fillRect(-15.5, -44, 31, 4);
+  if (art.bodyFront) {
+    ctx.save();
+    ctx.scale(f, 1);
+    art.bodyFront({ ctx, t });
+    ctx.restore();
+  }
 
   // --- front leg & shoe (follows the kick)
-  const fx = p.footX - p.x;
-  const fy = p.footY - p.y;
-  let footX = fx;
-  let footY = fy;
+  let footX = p.footX - p.x;
+  let footY = p.footY - p.y;
   if (!p.kicking && running) {
     footX += swing * 7 * f;
     footY -= Math.max(0, swing) * 5;
@@ -112,7 +180,7 @@ export function drawPlayer(ctx: CanvasRenderingContext2D, p: Player, alpha: numb
   shoe(ctx, footX, footY, kickRot, f, L.shoe, L.shoeSole);
 
   // --- front arm
-  limb(ctx, f * 12, -48, f * 17 + armSwing * f, -35, L.skin, 6);
+  limb(ctx, f * 12, -48, f * 17 + armSwing * f, -35, arms, 6);
 
   // --- head
   const hx = p.headX - p.x;
@@ -120,38 +188,49 @@ export function drawPlayer(ctx: CanvasRenderingContext2D, p: Player, alpha: numb
   ctx.translate(hx, hy);
   const idle = p.grounded && Math.abs(p.vx) < 30;
   const breathe = idle ? Math.sin(t * 2.6 + p.index * 1.7) * 0.018 : 0;
+  ctx.save();
   ctx.scale(1 - s * 0.25 - breathe * 0.5, 1 + s * 0.2 + breathe);
   drawHead(ctx, p, p.headR, f, t);
   ctx.restore();
+
+  // dizzy stars when stunned
+  if (p.stunT > 0) {
+    ctx.fillStyle = '#ffe14d';
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+      const a = t * 5 + (i / 3) * Math.PI * 2;
+      star(ctx, Math.cos(a) * p.headR * 0.9, -p.headR * 1.15 + Math.sin(a) * 8, 7, t * 4);
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
 }
 
-function shade(hex: string): string {
-  // darken a #rrggbb colour by ~25 %
-  const n = parseInt(hex.slice(1), 16);
-  const r = Math.floor(((n >> 16) & 255) * 0.75);
-  const g = Math.floor(((n >> 8) & 255) * 0.75);
-  const b = Math.floor((n & 255) * 0.75);
-  return `rgb(${r},${g},${b})`;
-}
-
+/** Draws just the head (used by the game and by the hero-select portraits). */
 export function drawHead(ctx: CanvasRenderingContext2D, p: Player, R: number, f: 1 | -1, t: number): void {
   const L = p.char.look;
-  const expr: Expression = p.expr;
-  const h: HeadDraw = { ctx, R, facing: f, t, expr };
+  const face = p.char.face;
+  const art = HERO_ART[p.char.id] ?? {};
+  const h: HeadDraw = { ctx, R, t, expr: p.expr };
 
-  p.char.drawBack?.(h);
+  ctx.save();
+  ctx.scale(f, 1);
+  art.back?.(h);
 
-  // ear on the back side
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = INK;
-  ctx.fillStyle = L.skin;
-  ctx.beginPath();
-  ctx.ellipse(-f * R * 0.86, R * 0.08, R * 0.2, R * 0.26, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
+  if (face.ear) {
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = INK;
+    ctx.fillStyle = L.skin;
+    ctx.beginPath();
+    ctx.ellipse(-R * 0.86, R * 0.08, R * 0.2, R * 0.26, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
 
   // head ball
-  const grad = ctx.createRadialGradient(-R * 0.35, -R * 0.45, R * 0.1, 0, 0, R * 1.05);
+  const grad = ctx.createRadialGradient(-R * 0.35 * f, -R * 0.45, R * 0.1, 0, 0, R * 1.05);
   grad.addColorStop(0, lighten(L.skin));
   grad.addColorStop(0.55, L.skin);
   grad.addColorStop(1, L.skinShade);
@@ -159,117 +238,299 @@ export function drawHead(ctx: CanvasRenderingContext2D, p: Player, R: number, f:
   ctx.beginPath();
   ctx.arc(0, 0, R, 0, Math.PI * 2);
   ctx.fill();
+
+  if (art.skin) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(0, 0, R, 0, Math.PI * 2);
+    ctx.clip();
+    art.skin(h);
+    // keep the shading on top of skin patterns
+    const sh = ctx.createRadialGradient(-R * 0.35, -R * 0.45, R * 0.3, 0, 0, R * 1.05);
+    sh.addColorStop(0, 'rgba(255,255,255,0.12)');
+    sh.addColorStop(0.6, 'rgba(0,0,0,0)');
+    sh.addColorStop(1, 'rgba(0,0,0,0.25)');
+    ctx.fillStyle = sh;
+    ctx.fillRect(-R, -R, R * 2, R * 2);
+    ctx.restore();
+  }
+
   ctx.lineWidth = 4.5;
+  ctx.strokeStyle = INK;
+  ctx.beginPath();
+  ctx.arc(0, 0, R, 0, Math.PI * 2);
   ctx.stroke();
 
-  // cheek
-  ctx.fillStyle = 'rgba(255,90,90,0.22)';
-  ctx.beginPath();
-  ctx.ellipse(f * R * 0.5, R * 0.32, R * 0.17, R * 0.1, 0, 0, Math.PI * 2);
-  ctx.fill();
+  if (face.cheeks) {
+    ctx.fillStyle = 'rgba(255,90,90,0.22)';
+    ctx.beginPath();
+    ctx.ellipse(R * 0.5, R * 0.32, R * 0.17, R * 0.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
-  drawFace(ctx, p, R, f, expr);
-  p.char.drawFront?.(h);
-}
-
-function lighten(hex: string): string {
-  const n = parseInt(hex.slice(1), 16);
-  const r = Math.min(255, ((n >> 16) & 255) + 40);
-  const g = Math.min(255, ((n >> 8) & 255) + 40);
-  const b = Math.min(255, (n & 255) + 40);
-  return `rgb(${r},${g},${b})`;
-}
-
-function drawFace(ctx: CanvasRenderingContext2D, p: Player, R: number, f: 1 | -1, expr: Expression): void {
-  const eyes = [
-    { x: f * R * 0.12, s: 0.9 },
-    { x: f * R * 0.54, s: 1 },
-  ];
-  const ey = -R * 0.06;
-  const lx = clamp(p.lookX, -1, 1);
+  // looking direction in mirrored space
+  const lx = clamp(p.lookX, -1, 1) * f;
   const ly = clamp(p.lookY, -1, 1);
-  const closed = p.blink > 0 || expr === 'happy';
+  drawEyes(ctx, p, face, R, lx, ly, t);
+  drawNose(ctx, face, R);
+  drawMouth(ctx, face, R, p.expr, t);
+  art.front?.(h);
+  ctx.restore();
+}
 
+// ------------------------------------------------------------------ face parts (mirrored space)
+
+const EYES = [
+  { x: 0.12, s: 0.9 },
+  { x: 0.54, s: 1 },
+];
+
+function drawEyes(
+  ctx: CanvasRenderingContext2D,
+  p: Player,
+  face: FaceStyle,
+  R: number,
+  lx: number,
+  ly: number,
+  t: number,
+): void {
+  const expr = p.expr;
+  const ey = -R * 0.06;
+  const blink = p.blink > 0;
+
+  if (face.eyes === 'visor') {
+    // robot: dark visor with glowing LED eyes
+    ctx.fillStyle = '#10141f';
+    ctx.beginPath();
+    ctx.roundRect(-R * 0.15, -R * 0.36, R * 1.1, R * 0.5, R * 0.18);
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+    ctx.fillStyle = '#4fd1ff';
+    ctx.shadowColor = '#4fd1ff';
+    ctx.shadowBlur = 10;
+    for (const e of EYES) {
+      const cx = R * e.x + lx * R * 0.07;
+      const cy = ey + ly * R * 0.05;
+      ctx.beginPath();
+      if (blink) ctx.rect(cx - R * 0.12, cy - 1.5, R * 0.24, 3);
+      else if (expr === 'happy') {
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = '#4fd1ff';
+        ctx.arc(cx, cy + R * 0.06, R * 0.1, Math.PI * 1.15, Math.PI * 1.85);
+        ctx.stroke();
+        continue;
+      } else {
+        const hh = expr === 'angry' || expr === 'effort' ? R * 0.1 : expr === 'sad' ? R * 0.12 : R * 0.18;
+        ctx.roundRect(cx - R * 0.1, cy - hh / 2, R * 0.2, hh, 3);
+      }
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+    return;
+  }
+
+  if (face.eyes === 'alien') {
+    for (const [i, e] of EYES.entries()) {
+      const cx = R * e.x + R * 0.04;
+      ctx.save();
+      ctx.translate(cx, ey);
+      ctx.rotate(i === 0 ? -0.35 : 0.35);
+      ctx.fillStyle = '#0d0d1a';
+      ctx.beginPath();
+      if (blink) ctx.ellipse(0, 0, R * 0.22, R * 0.03, 0, 0, Math.PI * 2);
+      else if (expr === 'happy') {
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#0d0d1a';
+        ctx.arc(0, R * 0.08, R * 0.16, Math.PI * 1.1, Math.PI * 1.9);
+        ctx.stroke();
+        ctx.restore();
+        continue;
+      } else ctx.ellipse(0, 0, R * 0.2, R * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = INK;
+      ctx.stroke();
+      if (!blink) {
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.beginPath();
+        ctx.arc(-R * 0.05 + lx * R * 0.06, -R * 0.1 + ly * R * 0.08, R * 0.06, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(199,125,255,0.6)';
+        ctx.beginPath();
+        ctx.arc(R * 0.06 + lx * R * 0.04, R * 0.1, R * 0.035, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    return;
+  }
+
+  const sleepy = face.eyes === 'sleepy';
+  const closed = blink || expr === 'happy';
   ctx.lineWidth = 3;
   ctx.strokeStyle = INK;
-  for (const e of eyes) {
+  for (const e of EYES) {
+    const ex = R * e.x;
     const rx = R * 0.18 * e.s;
     const ry = R * 0.23 * e.s;
     if (closed) {
       ctx.lineWidth = 3.5;
       ctx.beginPath();
-      if (expr === 'happy') ctx.arc(e.x, ey + ry * 0.3, rx, Math.PI * 1.1, Math.PI * 1.9);
+      if (expr === 'happy') ctx.arc(ex, ey + ry * 0.3, rx, Math.PI * 1.1, Math.PI * 1.9);
       else {
-        ctx.moveTo(e.x - rx, ey);
-        ctx.quadraticCurveTo(e.x, ey + ry * 0.45, e.x + rx, ey);
+        ctx.moveTo(ex - rx, ey);
+        ctx.quadraticCurveTo(ex, ey + ry * 0.45, ex + rx, ey);
       }
       ctx.stroke();
       continue;
     }
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.ellipse(e.x, ey, rx, ry, 0, 0, Math.PI * 2);
+    ctx.ellipse(ex, ey, rx, ry, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.lineWidth = 3;
     ctx.stroke();
-    // pupil follows the ball
-    const pr = R * (expr === 'shock' ? 0.06 : 0.092) * e.s;
-    const px = e.x + lx * rx * 0.48;
+    // iris + pupil follow the ball
+    const px = ex + lx * rx * 0.48;
     const py = ey + ly * ry * 0.45;
+    if (face.iris) {
+      ctx.fillStyle = face.iris;
+      ctx.beginPath();
+      ctx.arc(px, py, R * 0.13 * e.s, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.fillStyle = INK;
     ctx.beginPath();
-    ctx.arc(px, py, pr, 0, Math.PI * 2);
+    if (sleepy) ctx.ellipse(px, py, R * 0.035 * e.s, R * 0.1 * e.s, 0, 0, Math.PI * 2);
+    else ctx.arc(px, py, R * (expr === 'shock' ? 0.06 : 0.092) * e.s, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.arc(px - pr * 0.35, py - pr * 0.4, pr * 0.35, 0, Math.PI * 2);
+    ctx.arc(px - R * 0.035, py - R * 0.04, R * 0.032, 0, Math.PI * 2);
     ctx.fill();
-    // lids for sad/effort/angry
-    if (expr === 'sad' || expr === 'effort' || expr === 'angry') {
+
+    // lids: always half closed for sleepy eyes, plus mood lids
+    const lid = sleepy && expr !== 'shock' ? 0.5 : expr === 'sad' || expr === 'effort' || expr === 'angry' ? 0.35 : 0;
+    if (lid > 0) {
       ctx.save();
       ctx.beginPath();
-      ctx.ellipse(e.x, ey, rx + 1, ry + 1, 0, 0, Math.PI * 2);
+      ctx.ellipse(ex, ey, rx + 1, ry + 1, 0, 0, Math.PI * 2);
       ctx.clip();
       ctx.fillStyle = p.char.look.skinShade;
+      ctx.translate(ex, ey - ry + ry * 2 * lid);
+      const tilt = expr === 'sad' ? (e === EYES[0] ? 0.3 : -0.3) : expr === 'angry' ? (e === EYES[0] ? -0.3 : 0.3) : 0;
+      ctx.rotate(tilt);
+      ctx.fillRect(-rx * 2, -ry * 3, rx * 4, ry * 3);
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      const tilt = expr === 'sad' ? -0.35 * f : 0.35 * f;
-      ctx.translate(e.x, ey - ry * 0.35);
-      ctx.rotate(expr === 'effort' ? 0 : (e === eyes[0] ? -1 : 1) * tilt * -1);
-      ctx.fillRect(-rx * 2, -ry * 2, rx * 4, ry * 2);
+      ctx.moveTo(-rx * 1.5, 0);
+      ctx.lineTo(rx * 1.5, 0);
+      ctx.stroke();
       ctx.restore();
       ctx.beginPath();
-      ctx.ellipse(e.x, ey, rx, ry, 0, 0, Math.PI * 2);
+      ctx.ellipse(ex, ey, rx, ry, 0, 0, Math.PI * 2);
       ctx.stroke();
     }
   }
 
-  // eyebrows
-  ctx.lineWidth = 4;
-  ctx.lineCap = 'round';
+  if (face.brows) {
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = INK;
+    for (const e of EYES) {
+      const bx = R * e.x;
+      const by = ey - R * 0.33 * e.s;
+      const inner = e === EYES[0] ? 1 : -1;
+      let tilt = 0;
+      if (expr === 'angry' || expr === 'effort') tilt = 0.35;
+      if (expr === 'sad') tilt = -0.35;
+      const w = R * 0.16;
+      const dy = tilt * w * inner;
+      ctx.beginPath();
+      ctx.moveTo(bx - w, by - dy);
+      ctx.lineTo(bx + w, by + dy);
+      ctx.stroke();
+    }
+  }
+  void t;
+}
+
+function drawNose(ctx: CanvasRenderingContext2D, face: FaceStyle, R: number): void {
   ctx.strokeStyle = INK;
-  for (const e of eyes) {
-    const bx = e.x;
-    const by = ey - R * 0.33 * e.s;
-    const inner = e === eyes[0] ? 1 : -1; // towards the other eye
-    let tilt = 0;
-    if (expr === 'angry' || expr === 'effort') tilt = 0.35;
-    if (expr === 'sad') tilt = -0.35;
+  if (face.nose === 'human') {
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    const w = R * 0.16;
-    const dy = tilt * w * inner * f;
-    ctx.moveTo(bx - w, by - dy);
-    ctx.lineTo(bx + w, by + dy);
+    ctx.arc(R * 0.78, R * 0.14, R * 0.09, -Math.PI / 2, Math.PI / 2);
+    ctx.stroke();
+  } else if (face.nose === 'cat') {
+    ctx.fillStyle = '#ff8fab';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(R * 0.7, R * 0.12);
+    ctx.lineTo(R * 0.9, R * 0.12);
+    ctx.lineTo(R * 0.8, R * 0.24);
+    ctx.closePath();
+    ctx.fill();
     ctx.stroke();
   }
+}
 
-  // nose
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(f * R * 0.78, R * 0.14, R * 0.09, -Math.PI / 2, Math.PI / 2, f < 0);
-  ctx.stroke();
+function drawMouth(ctx: CanvasRenderingContext2D, face: FaceStyle, R: number, expr: Expression, t: number): void {
+  if (face.mouth === 'mask') return;
+  ctx.strokeStyle = INK;
+  ctx.lineCap = 'round';
 
-  // mouth
-  const mx = f * R * 0.38;
+  if (face.mouth === 'led') {
+    const mx = R * 0.45;
+    const my = R * 0.5;
+    ctx.fillStyle = '#10141f';
+    ctx.beginPath();
+    ctx.roundRect(mx - R * 0.28, my - R * 0.1, R * 0.56, R * 0.2, 4);
+    ctx.fill();
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.fillStyle = '#4fd1ff';
+    const cols = 7;
+    for (let i = 0; i < cols; i++) {
+      const u = i / (cols - 1) - 0.5;
+      let dy = 0;
+      if (expr === 'happy') dy = -(0.25 - u * u) * R * 0.25;
+      else if (expr === 'sad' || expr === 'angry') dy = (0.25 - u * u) * R * 0.22;
+      else if (expr === 'effort' || expr === 'shock') dy = Math.sin(t * 30 + i) * R * 0.04;
+      ctx.fillRect(mx + u * R * 0.46 - 2, my + dy * -1 - 2, 4, 4);
+    }
+    return;
+  }
+
+  if (face.mouth === 'cat') {
+    const mx = R * 0.8;
+    const my = R * 0.3;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    if (expr === 'happy' || expr === 'shock' || expr === 'effort') {
+      ctx.fillStyle = '#5a1020';
+      ctx.ellipse(mx - R * 0.05, my + R * 0.12, R * 0.12, R * (expr === 'happy' ? 0.12 : 0.09), 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    } else if (expr === 'sad' || expr === 'angry') {
+      ctx.moveTo(mx - R * 0.2, my + R * 0.16);
+      ctx.quadraticCurveTo(mx - R * 0.05, my + R * 0.04, mx + R * 0.1, my + R * 0.16);
+      ctx.stroke();
+    } else {
+      // "ω"
+      ctx.moveTo(mx - R * 0.2, my + R * 0.04);
+      ctx.quadraticCurveTo(mx - R * 0.12, my + R * 0.14, mx - R * 0.02, my + R * 0.02);
+      ctx.quadraticCurveTo(mx + R * 0.06, my + R * 0.14, mx + R * 0.14, my + R * 0.04);
+      ctx.stroke();
+    }
+    return;
+  }
+
+  // human mouth
+  const mx = R * 0.38;
   const my = R * 0.46;
   const mw = R * 0.24;
   ctx.lineWidth = 3.5;

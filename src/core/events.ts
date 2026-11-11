@@ -37,4 +37,7 @@ export type GameEvents = {
   goal: { scorer: number; x: number; y: number; golden: boolean };
   whistle: { kind: 'start' | 'end' | 'golden' };
   matchEnd: { winner: number };
+  superArmed: { player: number };
+  superShot: { player: number; id: string; x: number; y: number };
+  superHit: { player: number; x: number; y: number };
 };

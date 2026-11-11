@@ -14,6 +14,7 @@ import {
   type AppActions,
   type MatchMode,
 } from '../ui/screens';
+import { heroSelect } from '../ui/heroSelect';
 import { UI } from '../ui/ui';
 import { CHARACTERS, type CharacterDef } from './characters';
 import { Match } from './match';
@@ -96,9 +97,6 @@ export class Game implements AppActions {
     });
   }
 
-  private defaultChars(): [CharacterDef, CharacterDef] {
-    return [CHARACTERS[0], CHARACTERS[1]];
-  }
 
   // ------------------------------------------------------------------ AppActions
 
@@ -123,26 +121,35 @@ export class Game implements AppActions {
     this.ui.show(settingsScreen(this, back));
   }
 
-  startCpu(): void {
-    this.ui.hide();
-    this.startMatch({
-      mode: 'cpu',
-      chars: this.defaultChars(),
-      difficulty: this.settings.difficulty,
-      humanScheme: this.settings.humanScheme,
-      duration: this.settings.duration,
-    });
+  showHeroSelect(mode: 'cpu' | 'pvp'): void {
+    const hs = this.settings.heroes;
+    this.ui.show(
+      heroSelect({
+        mode,
+        initial: mode === 'cpu' ? [hs.p1, hs.cpu] : [hs.p1, hs.p2],
+        isLocked: () => false, // unlocking arrives with the tournament (stage 5)
+        rightLabel: DIFF_LABEL[this.settings.difficulty],
+        onBack: () => (mode === 'cpu' ? this.showCpuSetup() : this.showMain()),
+        onDone: (a, b) => {
+          hs.p1 = a.id;
+          if (mode === 'cpu') hs.cpu = b.id;
+          else hs.p2 = b.id;
+          this.saveSettings();
+          this.ui.hide();
+          this.startMatch({
+            mode,
+            chars: [a, b],
+            difficulty: this.settings.difficulty,
+            humanScheme: mode === 'cpu' ? this.settings.humanScheme : 'wasd',
+            duration: this.settings.duration,
+          });
+        },
+      }),
+    );
   }
 
   startPvp(): void {
-    this.ui.hide();
-    this.startMatch({
-      mode: 'pvp',
-      chars: this.defaultChars(),
-      difficulty: this.settings.difficulty,
-      humanScheme: 'wasd',
-      duration: this.settings.duration,
-    });
+    this.showHeroSelect('pvp');
   }
 
   rematch(): void {
@@ -151,11 +158,9 @@ export class Game implements AppActions {
   }
 
   changeHeroes(): void {
-    // Character select arrives in stage 3; for now go back to the match setup.
-    if (this.setup.mode === 'cpu') {
-      this.startDemo();
-      this.showCpuSetup();
-    } else this.showMain();
+    const mode = this.setup.mode === 'cpu' ? 'cpu' : 'pvp';
+    this.startDemo();
+    this.showHeroSelect(mode);
   }
 
   resume(): void {
