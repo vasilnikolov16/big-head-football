@@ -4,12 +4,13 @@ export type Action = 'left' | 'right' | 'jump' | 'kick' | 'super';
 
 export const ACTIONS: Action[] = ['left', 'right', 'jump', 'kick', 'super'];
 
-export const ACTION_LABELS: Record<Action, string> = {
-  left: 'Наляво',
-  right: 'Надясно',
-  jump: 'Скок',
-  kick: 'Ритник',
-  super: 'Супер удар',
+/** i18n keys of the action names */
+export const ACTION_KEYS: Record<Action, string> = {
+  left: 'act.left',
+  right: 'act.right',
+  jump: 'act.jump',
+  kick: 'act.kick',
+  super: 'act.super',
 };
 
 /** Key codes (KeyboardEvent.code) per action. The first one is the main key. */

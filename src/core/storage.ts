@@ -1,4 +1,5 @@
 import type { Difficulty } from '../ai/aiController';
+import type { Lang } from '../i18n/i18n';
 import { ACTIONS, cloneBinding, DEFAULT_P1, DEFAULT_P2, type Binding } from '../input/controls';
 
 export interface Settings {
@@ -15,7 +16,15 @@ export interface Settings {
   musicVolume: number;
   powerups: boolean;
   replays: boolean;
+  lang: Lang;
+  /** on-screen touch buttons */
+  touch: 'auto' | 'on' | 'off';
+  showFps: boolean;
+  /** settings format version (for migrations) */
+  version: number;
 }
+
+const VERSION = 2;
 
 const SETTINGS_KEY = 'kratunball.settings.v1';
 
@@ -28,7 +37,11 @@ const defaults = (): Settings => ({
   sfxVolume: 0.8,
   musicVolume: 0.5,
   powerups: true,
-  replays: true,
+  replays: false,
+  lang: 'bg',
+  touch: 'auto',
+  showFps: false,
+  version: VERSION,
 });
 
 export function read<T>(key: string): Partial<T> {
@@ -71,7 +84,13 @@ export function loadSettings(): Settings {
   s.sfxVolume = clamp01(s.sfxVolume, d.sfxVolume);
   s.musicVolume = clamp01(s.musicVolume, d.musicVolume);
   s.powerups = s.powerups !== false;
-  s.replays = s.replays !== false;
+  s.replays = s.replays === true;
+  // v1 had goal replays on by default: switch them off once
+  if ((saved.version ?? 1) < 2) s.replays = false;
+  s.version = VERSION;
+  if (s.lang !== 'bg' && s.lang !== 'en') s.lang = 'bg';
+  if (!['auto', 'on', 'off'].includes(s.touch)) s.touch = 'auto';
+  s.showFps = s.showFps === true;
   return s;
 }
 

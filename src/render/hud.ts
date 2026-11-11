@@ -2,6 +2,7 @@ import { FONT_DISPLAY, H, INK, W } from '../core/constants';
 import { clamp, easeOutBack, formatTime } from '../core/math';
 import type { Banner } from '../game/match';
 import { POWER_INFO } from '../game/powerups';
+import { t as tx } from '../i18n/i18n';
 import { drawPowerIcon } from './powerDraw';
 import type { RenderView } from './view';
 
@@ -106,7 +107,7 @@ function energyBar(ctx: CanvasRenderingContext2D, m: RenderView, side: 0 | 1, t:
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = INK;
-    ctx.fillText(p.charged ? 'ЗАРЕДЕН — ДОКОСНИ ТОПКАТА!' : 'СУПЕР УДАР — ГОТОВ!', x0 + w / 2, y + h / 2 + 1);
+    ctx.fillText(p.charged ? tx('hud.charged') : tx('hud.superReady'), x0 + w / 2, y + h / 2 + 1);
   }
   ctx.restore();
 }
@@ -174,7 +175,7 @@ export function drawHud(ctx: CanvasRenderingContext2D, m: RenderView, t: number)
   ctx.stroke();
   ctx.fillStyle = m.golden ? INK : low ? '#ffffff' : INK;
   ctx.font = `${m.golden ? 15 : 20}px ${FONT_DISPLAY}`;
-  ctx.fillText(m.golden ? 'ЗЛАТЕН ГОЛ' : formatTime(m.timeLeft), 0, 1);
+  ctx.fillText(m.golden ? tx('hud.golden') : formatTime(m.timeLeft), 0, 1);
   ctx.restore();
 }
 

@@ -1,12 +1,13 @@
 import { BALL_R, GROUND_Y, W } from '../core/constants';
 import { rand } from '../core/math';
+import { tr } from '../i18n/i18n';
 import type { Match } from './match';
 import type { Player } from './player';
 
 export type PowerType = 'bigBall' | 'smallBall' | 'highJump' | 'fireBall' | 'freeze' | 'bigHead' | 'smallGoal' | 'reverse';
 
 export interface PowerInfo {
-  name: string;
+  name: { bg: string; en: string };
   color: string;
   /** seconds the effect lasts */
   duration: number;
@@ -15,14 +16,14 @@ export interface PowerInfo {
 }
 
 export const POWER_INFO: Record<PowerType, PowerInfo> = {
-  bigBall: { name: 'Голяма топка', color: '#ff9f1c', duration: 8, target: 'ball' },
-  smallBall: { name: 'Малка топка', color: '#4fd1ff', duration: 8, target: 'ball' },
-  highJump: { name: 'Висок скок', color: '#7cff6b', duration: 9, target: 'self' },
-  fireBall: { name: 'Огнена топка', color: '#ff4d2d', duration: 9, target: 'self' },
-  freeze: { name: 'Замразяване', color: '#9be7ff', duration: 3, target: 'opponent' },
-  bigHead: { name: 'Голяма глава', color: '#ffd23f', duration: 9, target: 'self' },
-  smallGoal: { name: 'Малка врата', color: '#c77dff', duration: 9, target: 'self' },
-  reverse: { name: 'Обърнато управление', color: '#ff5ea8', duration: 5, target: 'opponent' },
+  bigBall: { name: { bg: 'Голяма топка', en: 'Big ball' }, color: '#ff9f1c', duration: 8, target: 'ball' },
+  smallBall: { name: { bg: 'Малка топка', en: 'Small ball' }, color: '#4fd1ff', duration: 8, target: 'ball' },
+  highJump: { name: { bg: 'Висок скок', en: 'High jump' }, color: '#7cff6b', duration: 9, target: 'self' },
+  fireBall: { name: { bg: 'Огнена топка', en: 'Fire ball' }, color: '#ff4d2d', duration: 9, target: 'self' },
+  freeze: { name: { bg: 'Замразяване', en: 'Freeze' }, color: '#9be7ff', duration: 3, target: 'opponent' },
+  bigHead: { name: { bg: 'Голяма глава', en: 'Big head' }, color: '#ffd23f', duration: 9, target: 'self' },
+  smallGoal: { name: { bg: 'Малка врата', en: 'Small goal' }, color: '#c77dff', duration: 9, target: 'self' },
+  reverse: { name: { bg: 'Обърнато управление', en: 'Reversed controls' }, color: '#ff5ea8', duration: 5, target: 'opponent' },
 };
 
 const TYPES = Object.keys(POWER_INFO) as PowerType[];
@@ -183,7 +184,7 @@ export class PowerUps {
       color: info.color,
       good: true,
     });
-    m.callout = { text: info.name.toUpperCase() + '!', color: info.color, player: p.index, t: 0 };
+    m.callout = { text: tr(info.name).toUpperCase() + '!', color: info.color, player: p.index, t: 0 };
   }
 
   private end(m: Match, e: ActiveEffect): void {

@@ -1,5 +1,6 @@
 import { FONT_DISPLAY, FONT_TEXT, H, INK, W } from '../core/constants';
 import { lerp } from '../core/math';
+import { t as tx } from '../i18n/i18n';
 import { drawBall, drawBallShadow } from './ballDraw';
 import { Fx } from './fx';
 import { drawCrossbar, drawGoalBack } from './goals';
@@ -229,11 +230,11 @@ export class Renderer {
       ctx.fill();
     }
     ctx.fillStyle = '#ffffff';
-    ctx.fillText('ПОВТОРЕНИЕ', 66, bar / 2 + 2);
+    ctx.fillText(tx('replay.title'), 66, bar / 2 + 2);
     ctx.font = `16px ${FONT_TEXT}`;
     ctx.textAlign = 'right';
     ctx.fillStyle = 'rgba(255,255,255,0.75)';
-    ctx.fillText('натисни клавиш, за да пропуснеш', W - 30, H - bar / 2);
+    ctx.fillText(tx('replay.skip'), W - 30, H - bar / 2);
     ctx.font = `18px ${FONT_DISPLAY}`;
     ctx.fillStyle = '#ffd23f';
     ctx.fillText('SLOW-MO', W - 30, bar / 2 + 2);

@@ -235,7 +235,7 @@ export class AudioEngine {
     if (Math.abs(level - this.crowdLevel) < 0.01) return;
     this.crowdLevel = level;
     const t = this.ctx.currentTime;
-    this.crowdGain.gain.setTargetAtTime(0.025 + level * 0.22, t, 0.25);
+    this.crowdGain.gain.setTargetAtTime(level <= 0 ? 0 : 0.025 + level * 0.22, t, 0.25);
     this.crowdFilter.Q.setTargetAtTime(0.6 + level * 0.6, t, 0.3);
   }
 

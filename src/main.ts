@@ -4,6 +4,7 @@ import '@fontsource/rubik/700.css';
 import './style.css';
 import './ui/ui.css';
 import { Game } from './game/game';
+import { onLangChange, t } from './i18n/i18n';
 
 async function boot(): Promise<void> {
   const canvas = document.getElementById('game') as HTMLCanvasElement;
@@ -17,7 +18,13 @@ async function boot(): Promise<void> {
   } catch {
     /* fall back to system fonts */
   }
+  const rotate = document.getElementById('rotate-text');
+  const setRotate = (): void => {
+    if (rotate) rotate.textContent = t('touch.rotate');
+  };
+  onLangChange(setRotate);
   const game = new Game(canvas, ui);
+  setRotate();
   game.start();
   if (import.meta.env.DEV) (window as unknown as { __game: Game }).__game = game;
 }

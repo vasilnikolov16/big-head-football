@@ -53,10 +53,12 @@ export class UI {
     return this.current?.id ?? null;
   }
 
-  show(screen: Screen): void {
-    this.leave();
+  /** instant: swap without the transition (e.g. switching tabs) */
+  show(screen: Screen, instant = false): void {
+    this.leave(instant);
     this.current = screen;
-    screen.root.classList.add('screen', 'entering');
+    screen.root.classList.add('screen');
+    if (!instant) screen.root.classList.add('entering');
     this.host.appendChild(screen.root);
     // force layout so the enter transition runs
     void screen.root.offsetWidth;
@@ -84,11 +86,15 @@ export class UI {
     this.current = null;
   }
 
-  private leave(): void {
+  private leave(instant = false): void {
     const old = this.current;
     if (!old) return;
     old.dispose?.();
     const el = old.root;
+    if (instant) {
+      el.remove();
+      return;
+    }
     el.classList.add('leaving');
     el.style.pointerEvents = 'none';
     window.setTimeout(() => el.remove(), 260);
@@ -211,36 +217,38 @@ export function optionRow<T>(
   return { el, left: () => shift(-1), right: () => shift(1) };
 }
 
-/** A 0..1 value shown as 10 segments, changed with ←/→ or by clicking. */
+/** A 0..1 value with a real 0–100 % slider (drag, click, or ←/→ in steps of 5 %). */
 export function sliderRow(label: string, get: () => number, set: (v: number) => void): NavItem {
   const el = h('div', 'opt-row');
   el.append(h('span', 'opt-label', label));
-  const bar = h('div', 'slider');
-  const segs: HTMLElement[] = [];
-  for (let i = 0; i < 10; i++) {
-    const sgm = h('span', 'seg');
-    sgm.addEventListener('click', (e) => {
-      e.stopPropagation();
-      set((i + 1) / 10);
-      refresh();
-    });
-    bar.append(sgm);
-    segs.push(sgm);
-  }
+  const wrap = h('div', 'slider');
+  const input = h('input', 'range');
+  input.type = 'range';
+  input.min = '0';
+  input.max = '100';
+  input.step = '1';
   const val = h('span', 'slider-val');
-  bar.append(val);
-  el.append(bar);
+  wrap.append(input, val);
+  el.append(wrap);
   const refresh = (): void => {
-    const v = Math.round(get() * 10);
-    segs.forEach((sg, i) => sg.classList.toggle('on', i < v));
-    val.textContent = v === 0 ? 'изкл.' : `${v * 10}%`;
+    const v = Math.round(get() * 100);
+    input.value = String(v);
+    input.style.setProperty('--fill', `${v}%`);
+    val.textContent = `${v}%`;
   };
+  input.addEventListener('input', () => {
+    set(Number(input.value) / 100);
+    refresh();
+  });
+  // keep clicks on the slider from triggering the row action
+  for (const ev of ['click', 'pointerdown', 'keydown']) input.addEventListener(ev, (e) => e.stopPropagation());
   const shift = (d: number): void => {
-    set(Math.max(0, Math.min(1, Math.round(get() * 10 + d) / 10)));
+    const v = Math.max(0, Math.min(100, Math.round(get() * 100 / 5) * 5 + d));
+    set(v / 100);
     refresh();
   };
   refresh();
-  return { el, left: () => shift(-1), right: () => shift(1) };
+  return { el, left: () => shift(-5), right: () => shift(5) };
 }
 
 export function keycap(text: string, wide = false): HTMLElement {

@@ -38,8 +38,8 @@ export interface FaceStyle {
 
 export interface CharacterDef {
   id: string;
-  name: string;
-  tagline: string;
+  name: { bg: string; en: string };
+  tagline: { bg: string; en: string };
   stats: CharacterStats;
   look: CharacterLook;
   face: FaceStyle;
@@ -53,8 +53,8 @@ const HUMAN: FaceStyle = { ear: true, eyes: 'normal', nose: 'human', mouth: 'hum
 export const CHARACTERS: CharacterDef[] = [
   {
     id: 'bobo',
-    name: 'Бобо',
-    tagline: 'Бръснарят с най-острите ножици в квартала',
+    name: { bg: 'Бобо', en: 'Bobo' },
+    tagline: { bg: 'Бръснарят с най-острите ножици в квартала', en: 'The barber with the sharpest scissors in town' },
     stats: { speed: 3, jump: 3, power: 4, head: 3 },
     look: {
       skin: '#f1c39a',
@@ -71,8 +71,8 @@ export const CHARACTERS: CharacterDef[] = [
   },
   {
     id: 'penka',
-    name: 'Пенка',
-    tagline: 'Котка. Спи 20 часа на ден, а останалите 4 — вкарва',
+    name: { bg: 'Пенка', en: 'Penka' },
+    tagline: { bg: 'Котка. Спи 20 часа на ден, а останалите 4 — вкарва', en: 'A cat. Sleeps 20 hours a day and scores in the other 4' },
     stats: { speed: 4, jump: 5, power: 2, head: 3 },
     look: {
       skin: '#9b6a43',
@@ -90,8 +90,8 @@ export const CHARACTERS: CharacterDef[] = [
   },
   {
     id: 'bip',
-    name: 'Бип-0',
-    tagline: 'Робот-нападател, версия 0.9 бета',
+    name: { bg: 'Бип-0', en: 'Bip-0' },
+    tagline: { bg: 'Робот-нападател, версия 0.9 бета', en: 'Robot striker, version 0.9 beta' },
     stats: { speed: 2, jump: 2, power: 5, head: 4 },
     look: {
       skin: '#b9c6d8',
@@ -109,8 +109,8 @@ export const CHARACTERS: CharacterDef[] = [
   },
   {
     id: 'roko',
-    name: 'Роко',
-    tagline: 'Свири соло на китара и на терена',
+    name: { bg: 'Роко', en: 'Roko' },
+    tagline: { bg: 'Свири соло на китара и на терена', en: 'Plays guitar solos on the pitch too' },
     stats: { speed: 4, jump: 3, power: 3, head: 3 },
     look: {
       skin: '#e8b48c',
@@ -127,8 +127,8 @@ export const CHARACTERS: CharacterDef[] = [
   },
   {
     id: 'gica',
-    name: 'Баба Гица',
-    tagline: 'Плете чорапи. И противниците си',
+    name: { bg: 'Баба Гица', en: 'Granny Gitsa' },
+    tagline: { bg: 'Плете чорапи. И противниците си', en: 'Knits socks. And her opponents' },
     stats: { speed: 2, jump: 2, power: 3, head: 5 },
     look: {
       skin: '#f6d2b8',
@@ -145,8 +145,8 @@ export const CHARACTERS: CharacterDef[] = [
   },
   {
     id: 'zig',
-    name: 'Зиг',
-    tagline: 'Дойде за футбола, остана за баничките',
+    name: { bg: 'Зиг', en: 'Zig' },
+    tagline: { bg: 'Дойде за футбола, остана за баничките', en: 'Came for the football, stayed for the pastries' },
     stats: { speed: 3, jump: 5, power: 2, head: 4 },
     look: {
       skin: '#7ddc5a',
@@ -164,8 +164,8 @@ export const CHARACTERS: CharacterDef[] = [
   },
   {
     id: 'ulf',
-    name: 'Улф',
-    tagline: 'Викинг. Не знае правилата, но ги чупи силно',
+    name: { bg: 'Улф', en: 'Ulf' },
+    tagline: { bg: 'Викинг. Не знае правилата, но ги чупи силно', en: 'A viking. Doesn’t know the rules, breaks them hard' },
     stats: { speed: 2, jump: 3, power: 5, head: 4 },
     look: {
       skin: '#f2c7a5',
@@ -183,8 +183,8 @@ export const CHARACTERS: CharacterDef[] = [
   },
   {
     id: 'senko',
-    name: 'Сенко',
-    tagline: 'Нинджа. Никой не го е виждал да тича',
+    name: { bg: 'Сенко', en: 'Senko' },
+    tagline: { bg: 'Нинджа. Никой не го е виждал да тича', en: 'A ninja. Nobody has ever seen him run' },
     stats: { speed: 5, jump: 4, power: 3, head: 1 },
     look: {
       skin: '#e9b993',

@@ -1,6 +1,7 @@
 import { GOAL_DEPTH, START_X, W } from '../core/constants';
 import { Emitter, type GameEvents, type Surface } from '../core/events';
 import { rand } from '../core/math';
+import { t, tr } from '../i18n/i18n';
 import { emptyIntent, type Controller, type PlayerIntent } from '../input/controls';
 import { Arena } from '../physics/arena';
 import { Ball, makeImpactLog, stepBall, collideBallWorld } from '../physics/ball';
@@ -82,7 +83,7 @@ export class Match {
     this.powerups = new PowerUps(config.powerups);
     this.players = [new Player(0, config.chars[0]), new Player(1, config.chars[1])];
     this.setupKickoff();
-    this.showBanner('ГОТОВИ?', '#ffffff', 1.0);
+    this.showBanner(t('banner.ready'), '#ffffff', 1.0);
   }
 
   showBanner(text: string, color: string, dur: number, sub?: string): void {
@@ -118,7 +119,7 @@ export class Match {
     this.supersUsed[p.index]++;
     p.setExpression('angry', 0.8);
     this.players[1 - p.index].setExpression('shock', 0.9);
-    this.callout = { text: SUPER_INFO[s.id].name.toUpperCase() + '!', color: SUPER_INFO[s.id].color, player: p.index, t: 0 };
+    this.callout = { text: tr(SUPER_INFO[s.id].name).toUpperCase() + '!', color: SUPER_INFO[s.id].color, player: p.index, t: 0 };
     this.events.emit('superShot', { player: p.index, id: s.id, x: this.ball.x, y: this.ball.y });
   }
 
@@ -265,7 +266,7 @@ export class Match {
     this.players[1 - scorer].setExpression(Math.random() < 0.5 ? 'sad' : 'angry', GOAL_TIME + 1);
     this.endSuper();
     const golden = this.golden;
-    this.showBanner(golden ? 'ЗЛАТЕН ГОЛ!' : 'ГОЛ!', golden ? '#ffd23f' : '#ffffff', GOAL_TIME - 0.3, this.config.names[scorer]);
+    this.showBanner(golden ? t('banner.goldenGoal') : t('banner.goal'), golden ? '#ffd23f' : '#ffffff', GOAL_TIME - 0.3, this.config.names[scorer]);
     this.events.emit('goal', { scorer, x: this.ball.x, y: this.ball.y, golden });
   }
 
@@ -275,7 +276,7 @@ export class Match {
       this.events.emit('whistle', { kind: 'golden' });
       this.setupKickoff();
       this.phaseT = -0.8; // a bit longer pause before the golden-goal kickoff
-      this.showBanner('ЗЛАТЕН ГОЛ', '#ffd23f', 1.9, 'Следващият гол печели!');
+      this.showBanner(t('banner.golden'), '#ffd23f', 1.9, t('banner.nextWins'));
     } else {
       this.endMatch();
     }

@@ -5,20 +5,20 @@ import type { Match } from './match';
 import type { Player } from './player';
 
 export interface SuperInfo {
-  name: string;
-  desc: string;
+  name: { bg: string; en: string };
+  desc: { bg: string; en: string };
   color: string;
 }
 
 export const SUPER_INFO: Record<SuperId, SuperInfo> = {
-  razor: { name: 'Бръсначен удар', desc: 'Ниска свистяща топка, минава през противника и го отхвърля.', color: '#ff4d6d' },
-  pounce: { name: 'Котешки скок', desc: 'Топката задрямва във въздуха… и изведнъж се хвърля към вратата.', color: '#ffb347' },
-  laser: { name: 'Лазер', desc: 'Абсолютно права линия с огромна скорост.', color: '#4fd1ff' },
-  sonic: { name: 'Соло на китара', desc: 'Звукова вълна по синусоида, зашеметява противника.', color: '#ff3df2' },
-  yarn: { name: 'Кълбо прежда', desc: 'Самонасочващо се кълбо, което оплита противника.', color: '#ff8fc7' },
-  warp: { name: 'Телепорт', desc: 'Топката изчезва и се появява точно пред чуждата врата.', color: '#9dff5c' },
-  thunder: { name: 'Гръм', desc: 'Топката излита до небето и се забива като мълния.', color: '#ffe14d' },
-  shadow: { name: 'Сенки', desc: 'Три еднакви топки — само една е истинска.', color: '#b8a9ff' },
+  razor: { name: { bg: 'Бръсначен удар', en: 'Razor Shot' }, desc: { bg: 'Ниска свистяща топка, минава през противника и го отхвърля.', en: 'A low whistling ball that cuts through the opponent and knocks them back.' }, color: '#ff4d6d' },
+  pounce: { name: { bg: 'Котешки скок', en: 'Cat Pounce' }, desc: { bg: 'Топката задрямва във въздуха… и изведнъж се хвърля към вратата.', en: 'The ball dozes off mid-air… then suddenly pounces at the goal.' }, color: '#ffb347' },
+  laser: { name: { bg: 'Лазер', en: 'Laser' }, desc: { bg: 'Абсолютно права линия с огромна скорост.', en: 'A perfectly straight line at insane speed.' }, color: '#4fd1ff' },
+  sonic: { name: { bg: 'Соло на китара', en: 'Guitar Solo' }, desc: { bg: 'Звукова вълна по синусоида, зашеметява противника.', en: 'A sine-wave sound blast that stuns the opponent.' }, color: '#ff3df2' },
+  yarn: { name: { bg: 'Кълбо прежда', en: 'Yarn Ball' }, desc: { bg: 'Самонасочващо се кълбо, което оплита противника.', en: 'A homing ball of yarn that ties up the opponent.' }, color: '#ff8fc7' },
+  warp: { name: { bg: 'Телепорт', en: 'Teleport' }, desc: { bg: 'Топката изчезва и се появява точно пред чуждата врата.', en: 'The ball vanishes and reappears right in front of the goal.' }, color: '#9dff5c' },
+  thunder: { name: { bg: 'Гръм', en: 'Thunder' }, desc: { bg: 'Топката излита до небето и се забива като мълния.', en: 'The ball flies to the sky and strikes down like lightning.' }, color: '#ffe14d' },
+  shadow: { name: { bg: 'Сенки', en: 'Shadow Clones' }, desc: { bg: 'Три еднакви топки — само една е истинска.', en: 'Three identical balls — only one is real.' }, color: '#b8a9ff' },
 };
 
 /** Height the laser and shadow shots rise to before firing (above any head). */

@@ -1,5 +1,6 @@
 import { FONT_DISPLAY, GRASS_TOP, GROUND_Y, H, W } from '../core/constants';
 import { mulberry32 } from '../core/math';
+import { t as tx } from '../i18n/i18n';
 
 /** Extra margin around the cached background so screen shake never shows edges. */
 export const BG_MARGIN = 28;
@@ -21,12 +22,12 @@ const RIGHT_SHIRTS = ['#2f8cff', '#4fd1ff', '#ffffff', '#5b6cff', '#1f6fe0', '#8
 const NEUTRAL = ['#7cd67c', '#c77dff', '#ff9ff3', '#2e2e48', '#f4a261', '#e9ecef'];
 
 const ADS = [
-  { text: 'КРАТУН-КОЛА', color: '#ff4d4d' },
-  { text: 'ЛЮТЕНИЦА PRO', color: '#ff9f1c' },
-  { text: 'БАНИЧКА+', color: '#ffd23f' },
-  { text: 'ГЛАВА ТВ', color: '#4fd1ff' },
-  { text: 'ШОПСКА ЕНЕРДЖИ', color: '#7cff6b' },
-  { text: 'ТИКВА БАНК', color: '#c77dff' },
+  { text: 'ad.1', color: '#ff4d4d' },
+  { text: 'ad.2', color: '#ff9f1c' },
+  { text: 'ad.3', color: '#ffd23f' },
+  { text: 'ad.4', color: '#4fd1ff' },
+  { text: 'ad.5', color: '#7cff6b' },
+  { text: 'ad.6', color: '#c77dff' },
 ];
 
 export const LAMPS: Array<{ x: number; y: number; aimX: number }> = [
@@ -469,7 +470,7 @@ export class Stadium {
       ctx.shadowColor = ad.color;
       ctx.shadowBlur = 12;
       ctx.fillStyle = ad.color;
-      ctx.fillText(ad.text, x0 + (segW - 6) / 2, 480 + off);
+      ctx.fillText(tx(ad.text), x0 + (segW - 6) / 2, 480 + off);
       ctx.restore();
     }
     ctx.restore();
