@@ -1177,9 +1177,10 @@
   --st: calc(env(safe-area-inset-top, 0px) / var(--ui-scale, 1));
   --edge: 26px;
   --low: 16px;
-  --gap: 14px;
-  --mw: 168px;
-  --aw: 176px;
+  --gap: 12px;
+  --mw: 150px;
+  --aw: 160px;
+  --bh: 82px;
 }
 .tbtn {
   position: absolute;
@@ -1188,8 +1189,8 @@
   align-items: center;
   justify-content: center;
   gap: 2px;
-  border-radius: 30px;
-  border: 4px solid rgba(255, 232, 160, 0.85);
+  border-radius: 24px;
+  border: 3px solid rgba(255, 232, 160, 0.85);
   background: linear-gradient(180deg, rgba(255, 206, 84, 0.4), rgba(150, 82, 12, 0.45));
   box-shadow:
     inset 0 3px 0 rgba(255, 255, 255, 0.28),
@@ -1212,14 +1213,9 @@
 }
 .tb-label {
   font-family: var(--display);
-  font-size: 23px;
+  font-size: 26px;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-}
-.tb-super .tb-icon,
-.tb-kick .tb-icon,
-.tb-jump .tb-icon {
-  font-size: 40px;
 }
 .tbtn.down {
   transform: scale(0.92);
@@ -1230,8 +1226,8 @@
 .tb-right {
   bottom: calc(var(--sb) + var(--low));
   width: var(--mw);
-  height: 112px;
-  font-size: 58px;
+  height: var(--bh);
+  font-size: 44px;
 }
 .tb-left {
   left: calc(var(--sl) + var(--edge));
@@ -1244,7 +1240,7 @@
 .tb-jump {
   bottom: calc(var(--sb) + var(--low));
   width: var(--aw);
-  height: 112px;
+  height: var(--bh);
 }
 .tb-jump {
   right: calc(var(--sr) + var(--edge));
@@ -1882,4 +1878,34 @@
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+}
+
+/* back button in the top-left corner of every menu screen */
+.corner-back {
+  position: absolute;
+  z-index: 5;
+  left: calc(env(safe-area-inset-left, 0px) / var(--ui-scale, 1) + 20px);
+  top: calc(env(safe-area-inset-top, 0px) / var(--ui-scale, 1) + 18px);
+  height: 52px;
+  padding: 0 22px 0 16px;
+  border-radius: 16px;
+  border: 3px solid rgba(255, 255, 255, 0.55);
+  background: rgba(12, 10, 32, 0.72);
+  color: #fff;
+  font-family: var(--display);
+  font-size: 22px;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+  transition:
+    transform 0.08s,
+    background 0.12s,
+    border-color 0.12s;
+}
+.corner-back:hover {
+  background: rgba(255, 210, 63, 0.3);
+  border-color: var(--gold);
+}
+.corner-back:active {
+  transform: scale(0.94);
 }

@@ -61,8 +61,7 @@ export function tournamentScreen(
     },
     'btn btn-alt btn-small',
   );
-  const back = button(t('back'), actions.back, 'btn btn-alt btn-small');
-  const items: NavItem[] = [play, fresh, back];
+  const items: NavItem[] = [play, fresh];
   box.append(h('div', 'row-buttons', undefined, items.map((i) => i.el)));
   return { id: 'tournament', root, items, back: actions.back };
 }

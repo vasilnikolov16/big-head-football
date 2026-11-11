@@ -2,7 +2,7 @@ import { ACHIEVEMENTS, type Career } from '../game/career';
 import { CHARACTERS, getCharacter } from '../game/characters';
 import { t, tr } from '../i18n/i18n';
 import { heroPortrait } from './portrait';
-import { button, h, type NavItem, type Screen, type UI } from './ui';
+import { h, type NavItem, type Screen, type UI } from './ui';
 
 type Tab = 'stats' | 'ach';
 
@@ -81,12 +81,11 @@ export function statsScreen(career: Career, ui: UI, back: () => void, tab: Tab =
     box.append(grid);
   }
 
-  const ok = button(t('back'), back, 'btn btn-go btn-small');
-  box.append(h('div', 'row-buttons', undefined, [ok.el]));
+
   return {
     id: 'stats',
     root,
-    items: [tabItem, ok],
+    items: [tabItem],
     initial: 0,
     back,
     onKey: (code) => {

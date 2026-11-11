@@ -1,3 +1,4 @@
+import { t } from '../i18n/i18n';
 /**
  * Minimal DOM screen manager: animated transitions + keyboard/mouse navigation.
  * Screens are plain DOM trees; navigation works on an ordered list of items.
@@ -30,6 +31,8 @@ const LEFT = ['ArrowLeft', 'KeyA'];
 const RIGHT = ['ArrowRight', 'KeyD'];
 const OK = ['Enter', 'NumpadEnter', 'Space'];
 const BACK = ['Escape', 'Backspace'];
+/** screens that have their own way back (or none): no corner back button */
+const NO_CORNER_BACK = new Set(['main', 'pause', 'onlinePause', 'post', 'trophy']);
 
 export type UiSound = 'move' | 'select' | 'back';
 
@@ -59,6 +62,19 @@ export class UI {
     this.current = screen;
     screen.root.classList.add('screen');
     if (!instant) screen.root.classList.add('entering');
+    // the same back button in the same place on every menu screen (mouse and touch)
+    if (screen.back && !NO_CORNER_BACK.has(screen.id)) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'corner-back';
+      b.textContent = '‹ ' + t('back');
+      b.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.handleKey('Escape'); // same as Esc: screens may step back inside first (e.g. un-ready a hero)
+      });
+      screen.root.append(b);
+    }
     this.host.appendChild(screen.root);
     // force layout so the enter transition runs
     void screen.root.offsetWidth;

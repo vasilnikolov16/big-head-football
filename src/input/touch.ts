@@ -34,7 +34,8 @@ export class TouchControls implements Controller {
       const el = document.createElement('div');
       el.className = `tbtn tb-${b}`;
       el.dataset.btn = b;
-      el.innerHTML = `<span class="tb-icon">${icon}</span>` + (label ? `<span class="tb-label" data-k="${label}"></span>` : '');
+      // actions show just their name, the arrows just an arrow
+      el.innerHTML = label ? `<span class="tb-label" data-k="${label}"></span>` : `<span class="tb-icon">${icon}</span>`;
       root.append(el);
       this.els.set(b, el);
     };

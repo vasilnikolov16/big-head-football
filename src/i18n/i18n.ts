@@ -143,8 +143,8 @@ const S: Record<string, [string, string]> = {
   ],
   'howto.touchTitle': ['На телефон / таблет', 'On phone / tablet'],
   'howto.touch': [
-    '◀ ▶ долу вляво — движение, бързо докосни два пъти за даш. Вдясно: ⚡ супер (светва при пълна лента), 👟 ритник, ⬆ скок. ❚❚ — пауза.',
-    '◀ ▶ bottom left — move, tap twice quickly to dash. On the right: ⚡ super (lights up when the bar is full), 👟 kick, ⬆ jump. ❚❚ — pause.',
+    '◀ ▶ долу вляво — движение, бързо докосни два пъти за даш. Вдясно: Супер (светва при пълна лента), Ритник, Скок. ❚❚ — пауза.',
+    '◀ ▶ bottom left — move, tap twice quickly to dash. On the right: Super (lights up when the bar is full), Kick, Jump. ❚❚ — pause.',
   ],
   'howto.ok': ['Разбрах!', 'Got it!'],
 

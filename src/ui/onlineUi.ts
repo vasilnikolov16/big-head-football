@@ -80,15 +80,14 @@ export function onlineMenu(o: OnlineMenuOptions): { screen: Screen; api: OnlineM
     { max: CODE_LEN, placeholder: t('online.codePh'), clean: normalizeCode, cls: 'code-row', onEnter: () => o.onJoin(code) },
   );
   const join = button(t('online.join'), () => o.onJoin(code));
-  const back = button(t('back'), () => o.onBack(), 'btn btn-alt btn-small');
   const status = h('div', 'net-status');
 
   const createBox = h('div', 'online-col', undefined, [create.el]);
   const joinBox = h('div', 'online-col', undefined, [codeRow.el, join.el]);
   const or = h('div', 'online-or', t('or'));
-  body.append(name.el, h('div', 'online-cols', undefined, [createBox, or, joinBox]), status, h('div', 'row-buttons', undefined, [back.el]));
+  body.append(name.el, h('div', 'online-cols', undefined, [createBox, or, joinBox]), status);
 
-  const items: NavItem[] = [name, create, codeRow, join, back];
+  const items: NavItem[] = [name, create, codeRow, join];
   const api: OnlineMenuApi = {
     setStatus(text, kind = 'info') {
       status.textContent = text;

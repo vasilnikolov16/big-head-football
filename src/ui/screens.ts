@@ -105,9 +105,8 @@ export function cpuSetup(app: AppActions): Screen {
   const set = controlSetRow(app);
   const dur = durationRow(app);
   const start = button(t('cpu.pick'), () => app.showHeroSelect('cpu'), 'btn btn-go');
-  const back = button(t('back'), () => app.showMain(), 'btn btn-alt btn-small');
-  const items = app.touchMode ? [diff, dur, start, back] : [diff, set, dur, start, back];
-  body.append(diff.el, desc, ...(app.touchMode ? [] : [set.el]), dur.el, h('div', 'row-buttons', undefined, [start.el, back.el]));
+  const items = app.touchMode ? [diff, dur, start] : [diff, set, dur, start];
+  body.append(diff.el, desc, ...(app.touchMode ? [] : [set.el]), dur.el, h('div', 'row-buttons', undefined, [start.el]));
   return { id: 'cpu', root, items, back: () => app.showMain(), initial: items.indexOf(start) };
 }
 
