@@ -7,6 +7,9 @@ export interface Stats {
   cpuWon: number;
   cpuLost: number;
   pvpPlayed: number;
+  onlinePlayed: number;
+  onlineWon: number;
+  onlineLost: number;
   goals: number;
   conceded: number;
   supers: number;
@@ -50,6 +53,9 @@ const emptyStats = (): Stats => ({
   cpuWon: 0,
   cpuLost: 0,
   pvpPlayed: 0,
+  onlinePlayed: 0,
+  onlineWon: 0,
+  onlineLost: 0,
   goals: 0,
   conceded: 0,
   supers: 0,

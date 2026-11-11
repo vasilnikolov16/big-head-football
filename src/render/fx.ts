@@ -6,6 +6,8 @@ import { SuperCinematic } from './cinematic';
 import { Particles } from './particles';
 import type { Stadium } from './stadium';
 
+export const EMOTE_TIME = 2.2;
+
 interface TrailPt {
   x: number;
   y: number;
@@ -27,6 +29,8 @@ export class Fx {
   readonly cinematic = new SuperCinematic();
   /** power-up bursts when a player arms the super shot */
   armBursts: Array<{ player: number; t: number; color: string }> = [];
+  /** online emote bubbles above the players */
+  emotes: Array<{ player: number; icon: string; t: number }> = [];
   private unsub: Array<() => void> = [];
 
   constructor(private stadium: Stadium) {}
@@ -40,6 +44,7 @@ export class Fx {
     this.hitStop = 0;
     this.trail = [];
     this.armBursts = [];
+    this.emotes = [];
     this.particles.clear();
     const st = this.stadium;
     const ev = m.events;
@@ -116,6 +121,12 @@ export class Fx {
     this.unsub = [];
   }
 
+  /** show an emote bubble above a player (replaces their previous one) */
+  emote(player: number, icon: string): void {
+    this.emotes = this.emotes.filter((e) => e.player !== player);
+    this.emotes.push({ player, icon, t: 0 });
+  }
+
   addShake(a: number): void {
     this.shake = Math.min(22, Math.max(this.shake, a));
   }
@@ -157,6 +168,8 @@ export class Fx {
     this.cinematic.update(dt);
     for (const b of this.armBursts) b.t += dt;
     this.armBursts = this.armBursts.filter((b) => b.t < 0.7);
+    for (const e of this.emotes) e.t += dt;
+    this.emotes = this.emotes.filter((e) => e.t < EMOTE_TIME);
     this.particles.update(dt);
     for (let i = 0; i < 2; i++) {
       const n = this.nets[i];

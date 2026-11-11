@@ -1,8 +1,8 @@
 import { FONT_DISPLAY, FONT_TEXT, H, INK, W } from '../core/constants';
-import { clamp, lerp } from '../core/math';
+import { clamp, easeOutBack, lerp } from '../core/math';
 import { t as tx } from '../i18n/i18n';
 import { drawBall, drawBallShadow } from './ballDraw';
-import { Fx } from './fx';
+import { EMOTE_TIME, Fx } from './fx';
 import { drawCrossbar, drawGoalBack } from './goals';
 import { drawBanner, drawHud } from './hud';
 import { drawPlayer, drawPlayerShadow } from './playerDraw';
@@ -18,7 +18,11 @@ export interface RenderOptions {
   replayT?: number | null;
   /** replay data: super glow colour of the current frame */
   replayGlow?: string | null;
+  /** online: ping in the corner and a centred note ("waiting for…") */
+  net?: { ping: number | null; note: string | null };
 }
+
+const EMOJI_FONT = '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
 
 export class Renderer {
   readonly canvas: HTMLCanvasElement;
@@ -154,6 +158,7 @@ export class Renderer {
     }
     sfx.drawFront(ctx, m, bx, by, br, t);
     fx.particles.draw(ctx);
+    this.drawEmotes(ctx, m, alpha);
 
     drawCrossbar(ctx, 0, m.arena, fx.barFlash[0]);
     drawCrossbar(ctx, 1, m.arena, fx.barFlash[1]);
@@ -172,6 +177,7 @@ export class Renderer {
       if (m.banner) drawBanner(ctx, m.banner);
     }
     cin.drawScreen(ctx, t);
+    if (opts.net) this.drawNet(ctx, opts.net, t);
 
     if (this.showFps) {
       ctx.font = `14px ${FONT_TEXT}`;
@@ -214,6 +220,91 @@ export class Renderer {
         }
         void t;
       }
+      ctx.restore();
+    }
+  }
+
+  /** Speech bubbles with an emoji above the players (online). */
+  private drawEmotes(ctx: CanvasRenderingContext2D, m: RenderView, alpha: number): void {
+    for (const e of this.fx.emotes) {
+      const p = m.players[e.player];
+      if (!p) continue;
+      const x = lerp(p.px, p.x, alpha);
+      const y = p.headY + (lerp(p.py, p.y, alpha) - p.y) - p.headR - 46 - Math.min(1, e.t / 0.3) * 8;
+      const pop = easeOutBack(clamp(e.t / 0.28, 0, 1));
+      const fade = clamp((EMOTE_TIME - e.t) / 0.35, 0, 1);
+      ctx.save();
+      ctx.globalAlpha = fade;
+      ctx.translate(x, y);
+      ctx.scale(pop, pop);
+      ctx.rotate(Math.sin(e.t * 9) * 0.06 * (1 - clamp(e.t, 0, 1)));
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.roundRect(-32, -28, 64, 54, 18);
+      ctx.moveTo(-8, 25);
+      ctx.lineTo(0, 38);
+      ctx.lineTo(8, 25);
+      ctx.fill();
+      ctx.stroke();
+      // hide the stroke between the tail and the bubble
+      ctx.fillRect(-7, 21, 14, 6);
+      ctx.font = `34px ${EMOJI_FONT}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = INK;
+      ctx.fillText(e.icon, 0, 1);
+      ctx.restore();
+    }
+  }
+
+  /** Ping pill (top-right) and the "waiting for…" note. */
+  private drawNet(ctx: CanvasRenderingContext2D, net: { ping: number | null; note: string | null }, t: number): void {
+    if (net.ping !== null) {
+      const ms = Math.round(net.ping);
+      const color = ms < 90 ? '#7cff6b' : ms < 160 ? '#ffd23f' : '#ff6b6b';
+      ctx.save();
+      ctx.font = `14px ${FONT_TEXT}`;
+      const label = `${ms} ms`;
+      const w = ctx.measureText(label).width + 38;
+      const x = W - w - 14;
+      const y = 14;
+      ctx.fillStyle = 'rgba(12,10,32,0.7)';
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, 24, 12);
+      ctx.fill();
+      // signal bars
+      for (let i = 0; i < 3; i++) {
+        const on = i === 0 || (i === 1 && ms < 160) || (i === 2 && ms < 90);
+        ctx.fillStyle = on ? color : 'rgba(255,255,255,0.25)';
+        ctx.fillRect(x + 10 + i * 6, y + 16 - (i + 1) * 3.5, 4, (i + 1) * 3.5);
+      }
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, x + 32, y + 12.5);
+      ctx.restore();
+    }
+    if (net.note) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(5,4,20,0.45)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.font = `30px ${FONT_DISPLAY}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const dots = '.'.repeat(1 + (Math.floor(t * 3) % 3));
+      const text = net.note.replace(/…$/, '') + dots;
+      const w = ctx.measureText(net.note).width + 90;
+      ctx.fillStyle = 'rgba(12,10,32,0.92)';
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.roundRect(W / 2 - w / 2, H / 2 - 36, w, 72, 20);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(text, W / 2, H / 2 + 2);
       ctx.restore();
     }
   }

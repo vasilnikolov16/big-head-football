@@ -16,6 +16,10 @@ export class TouchControls implements Controller {
   private seq = 0;
   private visible = true;
   onPause: () => void = () => {};
+  /** online: an emote was picked from the emote row */
+  onEmote: (i: number) => void = () => {};
+  private emoteBtn: HTMLElement;
+  private emoteRow: HTMLElement;
   /** first touch anywhere (used to switch on touch mode and go fullscreen) */
   onFirstTouch: () => void = () => {};
 
@@ -44,6 +48,33 @@ export class TouchControls implements Controller {
       this.onPause();
     });
     root.append(pause);
+    // online emotes: a button that opens a row of emojis
+    const emoteBtn = document.createElement('div');
+    emoteBtn.className = 'tbtn tb-emote';
+    emoteBtn.innerHTML = '<span>😀</span>';
+    const row = document.createElement('div');
+    row.className = 'emote-row';
+    ['😂', '👏', '😡', '😱'].forEach((icon, i) => {
+      const b = document.createElement('div');
+      b.className = 'emote-pick';
+      b.textContent = icon;
+      b.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        row.classList.remove('open');
+        this.onEmote(i);
+      });
+      row.append(b);
+    });
+    emoteBtn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      row.classList.toggle('open');
+    });
+    root.append(emoteBtn, row);
+    this.emoteBtn = emoteBtn;
+    this.emoteRow = row;
+    this.setEmotes(false);
     host.append(root);
 
     root.addEventListener('pointerdown', this.down, { passive: false });
@@ -76,6 +107,12 @@ export class TouchControls implements Controller {
     for (const f of this.fingers.values()) if (f === b) return;
     this.held.delete(b);
     this.els.get(b)!.classList.remove('down');
+  }
+
+  /** the emote button is only there in online matches */
+  setEmotes(on: boolean): void {
+    this.emoteBtn.style.display = on ? '' : 'none';
+    if (!on) this.emoteRow.classList.remove('open');
   }
 
   private down = (e: PointerEvent): void => {

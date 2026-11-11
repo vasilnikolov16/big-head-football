@@ -29,6 +29,8 @@ export interface Callout {
   color: string;
   player: number;
   t: number;
+  /** what it announces, so an online guest can show it in its own language */
+  ref?: { kind: 'super' | 'power'; id: string };
 }
 
 export interface Banner {
@@ -37,6 +39,11 @@ export interface Banner {
   color: string;
   t: number; // time since shown
   dur: number;
+  /** i18n keys (online guests translate the banner themselves) */
+  key?: string;
+  subKey?: string;
+  /** index of the player whose name is the subtitle */
+  subPlayer?: number;
 }
 
 const KICKOFF_TIME = 1.1;
@@ -85,11 +92,17 @@ export class Match {
     this.powerups = new PowerUps(config.powerups);
     this.players = [new Player(0, config.chars[0]), new Player(1, config.chars[1])];
     this.setupKickoff();
-    this.showBanner(t('banner.ready'), '#ffffff', 1.0);
+    this.bannerKey('banner.ready', '#ffffff', 1.0);
   }
 
   showBanner(text: string, color: string, dur: number, sub?: string): void {
     this.banner = { text, color, dur, t: 0, sub };
+  }
+
+  /** Banner from translation keys; sub is a key or the name of a player. */
+  private bannerKey(key: string, color: string, dur: number, sub?: { key?: string; player?: number }): void {
+    const subText = sub?.key ? t(sub.key) : sub?.player !== undefined ? this.config.names[sub.player] : undefined;
+    this.banner = { text: t(key), color, dur, t: 0, sub: subText, key, subKey: sub?.key, subPlayer: sub?.player };
   }
 
   private setupKickoff(): void {
@@ -121,7 +134,7 @@ export class Match {
     this.supersUsed[p.index]++;
     p.setExpression('angry', 0.8);
     this.players[1 - p.index].setExpression('shock', 0.9);
-    this.callout = { text: tr(SUPER_INFO[s.id].name).toUpperCase() + '!', color: SUPER_INFO[s.id].color, player: p.index, t: 0 };
+    this.callout = { text: tr(SUPER_INFO[s.id].name).toUpperCase() + '!', color: SUPER_INFO[s.id].color, player: p.index, t: 0, ref: { kind: 'super', id: s.id } };
     this.events.emit('superShot', { player: p.index, id: s.id, x: this.ball.x, y: this.ball.y });
   }
 
@@ -271,7 +284,7 @@ export class Match {
     this.players[1 - scorer].setExpression(Math.random() < 0.5 ? 'sad' : 'angry', GOAL_TIME + 1);
     this.endSuper();
     const golden = this.golden;
-    this.showBanner(golden ? t('banner.goldenGoal') : t('banner.goal'), golden ? '#ffd23f' : '#ffffff', GOAL_TIME - 0.3, this.config.names[scorer]);
+    this.bannerKey(golden ? 'banner.goldenGoal' : 'banner.goal', golden ? '#ffd23f' : '#ffffff', GOAL_TIME - 0.3, { player: scorer });
     this.events.emit('goal', { scorer, x: this.ball.x, y: this.ball.y, golden });
   }
 
@@ -281,7 +294,7 @@ export class Match {
       this.events.emit('whistle', { kind: 'golden' });
       this.setupKickoff();
       this.phaseT = -0.8; // a bit longer pause before the golden-goal kickoff
-      this.showBanner(t('banner.golden'), '#ffd23f', 1.9, t('banner.nextWins'));
+      this.bannerKey('banner.golden', '#ffd23f', 1.9, { key: 'banner.nextWins' });
     } else {
       this.endMatch();
     }

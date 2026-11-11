@@ -6,6 +6,17 @@ import { t as tx } from '../i18n/i18n';
 import { drawPowerIcon } from './powerDraw';
 import type { RenderView } from './view';
 
+/** Dark team colours get white text on their tag pill. */
+function isDark(hex: string): boolean {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return false;
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return 0.299 * r + 0.587 * g + 0.114 * b < 110;
+}
+
 function plate(ctx: CanvasRenderingContext2D, side: 0 | 1, color: string, name: string, tag: string): void {
   const dir = side === 0 ? -1 : 1;
   const inner = W / 2 + dir * 96;
@@ -45,7 +56,7 @@ function plate(ctx: CanvasRenderingContext2D, side: 0 | 1, color: string, name: 
     ctx.beginPath();
     ctx.roundRect(tx, 31, tw, 18, 5);
     ctx.fill();
-    ctx.fillStyle = INK;
+    ctx.fillStyle = isDark(color) ? '#ffffff' : INK;
     ctx.textAlign = 'left';
     ctx.fillText(tag, tx + 6, 40.5);
   }

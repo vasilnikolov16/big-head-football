@@ -8,6 +8,7 @@ import { setLang, t, tr } from '../i18n/i18n';
 import { KeyboardController, menuKeys, type Controller } from '../input/controls';
 import { Keyboard } from '../input/keyboard';
 import { MultiController, TouchControls } from '../input/touch';
+import { OnlineSession } from '../net/online';
 import { Renderer } from '../render/renderer';
 import { heroSelect } from '../ui/heroSelect';
 import { cpuSetup, howToPlay, mainMenu, pauseScreen, postMatch, type AppActions, type MatchMode } from '../ui/screens';
@@ -65,6 +66,7 @@ export class Game implements AppActions {
   private touch: TouchControls;
   private toaster: Toaster;
   private sawTouch = false;
+  readonly online: OnlineSession = new OnlineSession(this);
 
   constructor(canvas: HTMLCanvasElement, uiHost: HTMLElement) {
     setLang(this.settings.lang);
@@ -72,6 +74,7 @@ export class Game implements AppActions {
     this.touch = new TouchControls(uiHost);
     this.touch.onPause = () => this.onKey('Escape');
     this.touch.onFirstTouch = () => this.onFirstTouch();
+    this.touch.onEmote = (i) => this.online.emote(i);
     this.ui = new UI(uiHost);
     this.toaster = new Toaster(uiHost, () => this.audio.play('powerPick', 0.8));
     this.ui.onSound = (snd) => this.audio.play(snd === 'move' ? 'uiMove' : snd === 'select' ? 'uiSelect' : 'uiBack');
@@ -81,6 +84,12 @@ export class Game implements AppActions {
     this.onSettingsChanged();
     this.startDemo();
     this.showMain();
+    // a shared room link: ?room=K7QX
+    const code = new URLSearchParams(location.search).get('room');
+    if (code) {
+      history.replaceState(null, '', location.pathname);
+      this.online.open(code, '', true);
+    }
   }
 
   /** On-screen buttons are used (phone / tablet, or forced in the settings). */
@@ -158,10 +167,60 @@ export class Game implements AppActions {
     this.kb.flushPresses();
   }
 
-  private startDemo(): void {
+  startDemo(): void {
     const a = Math.floor(Math.random() * CHARACTERS.length);
     const b = (a + 1) % CHARACTERS.length;
     this.startMatch({ mode: 'demo', chars: [CHARACTERS[a], CHARACTERS[b]], difficulty: 'hard', humanScheme: 'wasd', duration: 90 });
+  }
+
+  // ------------------------------------------------------------------ online
+
+  showOnline(): void {
+    this.online.open();
+  }
+
+  /** Controls of the player on this device: both key sets + touch, idle while a menu is open. */
+  localController(): Controller {
+    const c = this.settings.controls;
+    const all = new MultiController([new KeyboardController(this.kb, c.p1), new KeyboardController(this.kb, c.p2), this.touch]);
+    return {
+      read: (out) => {
+        all.read(out);
+        if (this.ui.active) {
+          out.move = 0;
+          out.jumpHeld = out.jumpPressed = out.kickPressed = out.superPressed = false;
+        }
+      },
+    };
+  }
+
+  /** The online session hands over a match (host: the real one, guest: the mirror). */
+  beginOnlineMatch(m: Match): void {
+    this.setup = { mode: 'online', chars: m.config.chars, difficulty: 'medium', humanScheme: 'wasd', duration: m.config.duration };
+    this.match = m;
+    this.renderer.fx.attach(m, true);
+    this.gameAudio.attach(m);
+    this.tracker = null;
+    this.recorder.clear();
+    this.replay = null;
+    this.replayAt = -1;
+    this.music.setMood('match');
+    this.touch.clear();
+    this.acc = 0;
+    this.paused = false;
+    this.postShown = false;
+    this.kb.flushPresses();
+  }
+
+  /** back to the menu background match */
+  endOnlineMatch(): void {
+    this.paused = false;
+    this.replay = null;
+    this.startDemo();
+  }
+
+  toast(icon: string, title: string, body: string): void {
+    this.toaster.show(icon, title, body);
   }
 
   // ------------------------------------------------------------------ AppActions
@@ -176,7 +235,7 @@ export class Game implements AppActions {
     this.kb.setGameKeys([...Object.values(c.p1).flat(), ...Object.values(c.p2).flat()]);
     this.audio.setVolumes(this.settings.sfxVolume, this.settings.musicVolume);
     this.renderer.showFps = this.settings.showFps;
-    if (this.match && this.setup.mode !== 'demo') {
+    if (this.match && this.setup.mode !== 'demo' && this.setup.mode !== 'online') {
       this.match.powerups.enabled = this.settings.powerups;
       if (!this.settings.powerups) this.match.powerups.endAll(this.match);
     }
@@ -307,6 +366,10 @@ export class Game implements AppActions {
   }
 
   quitToMenu(): void {
+    if (this.online.active) {
+      this.online.leave();
+      return;
+    }
     this.paused = false;
     this.replay = null;
     this.startDemo();
@@ -324,6 +387,18 @@ export class Game implements AppActions {
     }
     if (this.ui.active) {
       this.ui.handleKey(code);
+      return;
+    }
+    if (this.setup.mode === 'online') {
+      if (code === 'Escape' || code === 'KeyP') {
+        this.online.showMenu();
+        return;
+      }
+      // emotes on 1-4 (unless those keys are bound to the game)
+      const d = /^(?:Digit|Numpad)([1-4])$/.exec(code);
+      const c = this.settings.controls;
+      const bound = [...Object.values(c.p1).flat(), ...Object.values(c.p2).flat()].includes(code);
+      if (d && !bound) this.online.emote(Number(d[1]) - 1);
       return;
     }
     // any key skips the slow-motion replay
@@ -350,9 +425,14 @@ export class Game implements AppActions {
     this.last = now;
     const fx = this.renderer.fx;
     const demo = this.setup.mode === 'demo';
+    const net = this.setup.mode === 'online' ? this.online : null;
     if (!this.paused) {
       this.t += dtReal;
-      if (this.replay) {
+      if (net && !net.simulates) {
+        // guest: the host simulates; show its stream (its hit-stops are already in it)
+        net.frameBefore(now);
+        fx.hitStop = 0;
+      } else if (this.replay) {
         this.replay.update(dtReal);
         if (this.replay.done) {
           this.replay = null;
@@ -361,12 +441,16 @@ export class Game implements AppActions {
       } else if (fx.hitStop > 0) {
         // hit-stop: freeze the simulation for a few frames on big impacts
         fx.hitStop = Math.max(0, fx.hitStop - dtReal);
+      } else if (net && !net.frameBefore(now)) {
+        // host waiting for the guest
+        this.acc = 0;
       } else {
         // super-shot cinematic slows the game down for a moment
         this.acc += dtReal * this.timeScale * fx.cinematic.timeFactor();
         while (this.acc >= DT) {
           this.match.step(DT);
-          this.recorder.record(this.match);
+          if (net) net.afterStep();
+          else this.recorder.record(this.match);
           this.acc -= DT;
           if (this.replayAt >= 0 && this.match.time >= this.replayAt) {
             this.replayAt = -1;
@@ -376,21 +460,24 @@ export class Game implements AppActions {
           }
         }
       }
+      if (net) net.frameAfter(now);
       this.renderer.update(dtReal);
       this.audio.setCrowd(demo ? 0 : this.renderer.stadium.excitement);
-      if (!this.replay) this.checkMatchOver();
+      if (!this.replay && !net) this.checkMatchOver();
     }
     // on-screen buttons only while a match against the computer is being played
     const playing = !demo && !this.ui.active && !this.replay && this.setup.mode !== 'pvp' && this.match.phase !== 'ended';
     this.touch.setVisible(this.touchMode && playing);
-    const me = this.match.players[0];
+    this.touch.setEmotes(!!net);
+    const me = this.match.players[net ? net.side : 0];
     this.touch.setSuperReady(me.energy >= 1, me.charged);
 
     if (this.replay) {
       const v = this.replay.view;
       this.renderer.render(v, 1, this.t, { hud: true, replayT: this.replay.t, replayGlow: v.superColor });
     } else {
-      this.renderer.render(this.match, this.acc / DT, this.t, { hud: !demo });
+      const alpha = net && !net.simulates ? 1 : this.acc / DT;
+      this.renderer.render(this.match, alpha, this.t, { hud: !demo, net: net ? net.netInfo() : undefined });
     }
     requestAnimationFrame(this.frame);
   };

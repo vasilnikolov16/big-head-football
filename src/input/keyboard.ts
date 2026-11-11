@@ -38,6 +38,17 @@ function codeOf(e: KeyboardEvent): string {
   return k;
 }
 
+/** Typing a name or a room code: the game must not react to those keys. */
+function typing(e: KeyboardEvent): boolean {
+  const el = e.target as HTMLElement | null;
+  if (!el || !el.tagName) return false;
+  const tag = el.tagName;
+  if (tag === 'TEXTAREA' || el.isContentEditable) return true;
+  if (tag !== 'INPUT') return false;
+  const type = (el as HTMLInputElement).type;
+  return type === 'text' || type === 'search' || type === 'url' || type === 'email' || type === 'password' || type === 'number' || type === 'tel';
+}
+
 export class Keyboard {
   private down = new Map<string, number>();
   private presses = new Map<string, number>();
@@ -56,6 +67,7 @@ export class Keyboard {
   }
 
   private onDown = (e: KeyboardEvent): void => {
+    if (typing(e)) return;
     const code = codeOf(e);
     if (BLOCKED.has(code) || this.gameKeys.has(code)) e.preventDefault();
     if (e.repeat) return;
@@ -66,6 +78,10 @@ export class Keyboard {
 
   private onUp = (e: KeyboardEvent): void => {
     const code = codeOf(e);
+    if (typing(e)) {
+      this.down.delete(code);
+      return;
+    }
     if (BLOCKED.has(code) || this.gameKeys.has(code)) e.preventDefault();
     this.down.delete(code);
   };

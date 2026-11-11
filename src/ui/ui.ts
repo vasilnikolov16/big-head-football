@@ -255,3 +255,48 @@ export function keycap(text: string, wide = false): HTMLElement {
   const arrow = /^[←→↑↓]$/.test(text);
   return h('kbd', `key${wide ? ' wide' : ''}${arrow ? ' arrow' : ''}`, text);
 }
+
+/** A labelled text field. Enter/Esc leave the field; the menu keys work again afterwards. */
+export function textRow(
+  label: string,
+  get: () => string,
+  set: (v: string) => void,
+  opts: { max: number; placeholder?: string; clean?: (v: string) => string; cls?: string; onEnter?: () => void } = { max: 20 },
+): NavItem & { input: HTMLInputElement } {
+  const el = h('div', `opt-row text-row ${opts.cls ?? ''}`);
+  el.append(h('span', 'opt-label', label));
+  const input = h('input', 'text-input');
+  input.type = 'text';
+  input.maxLength = opts.max;
+  input.autocomplete = 'off';
+  input.spellcheck = false;
+  input.setAttribute('autocapitalize', 'off');
+  if (opts.placeholder) input.placeholder = opts.placeholder;
+  input.value = get();
+  el.append(input);
+  input.addEventListener('input', () => {
+    const v = opts.clean ? opts.clean(input.value) : input.value;
+    if (v !== input.value) input.value = v;
+    set(v);
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      input.blur();
+      opts.onEnter?.();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      input.blur();
+    }
+  });
+  // clicks inside the field must not trigger the row
+  input.addEventListener('click', (e) => e.stopPropagation());
+  return {
+    el,
+    input,
+    activate: () => {
+      input.focus();
+      input.select();
+    },
+  };
+}

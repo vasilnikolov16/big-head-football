@@ -7,7 +7,7 @@ import { drawBall } from '../render/ballDraw';
 import { controlSetRow, difficultyRow, durationRow, type SettingsHost } from './settingsUi';
 import { button, h, keycap, type NavItem, type Screen } from './ui';
 
-export type MatchMode = 'cpu' | 'pvp' | 'tournament' | 'demo';
+export type MatchMode = 'cpu' | 'pvp' | 'tournament' | 'demo' | 'online';
 
 /** What the screens can ask the game to do. */
 export interface AppActions extends SettingsHost {
@@ -19,6 +19,7 @@ export interface AppActions extends SettingsHost {
   showHeroSelect(mode: 'cpu' | 'pvp' | 'tournament'): void;
   showTournament(): void;
   showStats(): void;
+  showOnline(): void;
   startPvp(): void;
   rematch(): void;
   changeHeroes(): void;
@@ -64,6 +65,7 @@ export function mainMenu(app: AppActions): Screen {
   const list = h('div', 'menu-list');
   const items: NavItem[] = [
     button(t('menu.cpu'), () => app.showCpuSetup()),
+    button(t('menu.online'), () => app.showOnline(), 'btn', false, '🌐'),
     // two players need a keyboard (one phone screen is too small for 2 sets of buttons)
     button(t('menu.pvp'), () => app.startPvp(), 'btn', app.touchMode, app.touchMode ? t('keyboardOnly') : undefined),
     button(t('menu.tournament'), () => app.showTournament()),
@@ -149,7 +151,7 @@ export function howToPlay(app: AppActions, back: () => void): Screen {
       controlsCard(t('controls.p2'), '#2f8cff', app.settings.controls.p2),
     );
   const tips = h('ul', 'tips');
-  for (const k of ['howto.tip1', 'howto.tip2', 'howto.tip3', 'howto.tip4', 'howto.tip5', 'howto.tip6']) tips.append(h('li', '', t(k)));
+  for (const k of ['howto.tip1', 'howto.tip2', 'howto.tip3', 'howto.tip4', 'howto.tip5', 'howto.tip6', 'howto.tip7']) tips.append(h('li', '', t(k)));
   const ok = button(t('howto.ok'), back, 'btn btn-go btn-small');
   body.append(cards, tips, h('div', 'row-buttons', undefined, [ok.el]));
   return { id: 'howto', root, items: [ok], back };
@@ -190,6 +192,17 @@ export interface PostMatchExtra {
   career: CareerResult | null;
   /** tournament: go back to the ladder (or the trophy) */
   onContinue?: () => void;
+  online?: PostOnline;
+}
+
+/** Online post-match: rematch needs both players, the status line updates live. */
+export interface PostOnline {
+  side: 0 | 1;
+  rematch: () => void;
+  change: () => void;
+  leave: () => void;
+  /** the session calls update(status, wantsRematch) whenever something changes */
+  bind: (update: (status: string, iWant: boolean) => void) => void;
 }
 
 export function postMatch(app: AppActions, m: Match, mode: MatchMode, extra: PostMatchExtra): Screen {
@@ -199,9 +212,11 @@ export function postMatch(app: AppActions, m: Match, mode: MatchMode, extra: Pos
 
   let title: string;
   let cls: string;
-  if (mode === 'cpu' || mode === 'tournament') {
-    title = m.winner === 0 ? t('post.win') : m.winner === 1 ? t('post.lose') : t('post.draw');
-    cls = m.winner === 0 ? 'win' : m.winner === 1 ? 'lose' : 'draw';
+  const online = extra.online;
+  if (mode === 'cpu' || mode === 'tournament' || online) {
+    const me = online?.side ?? 0;
+    title = m.winner === me ? t('post.win') : m.winner === 1 - me ? t('post.lose') : t('post.draw');
+    cls = m.winner === me ? 'win' : m.winner === 1 - me ? 'lose' : 'draw';
   } else {
     title = m.winner < 0 ? t('post.draw') : t('post.winner', { n: m.config.names[m.winner].toUpperCase() });
     cls = m.winner < 0 ? 'draw' : 'win';
@@ -255,7 +270,21 @@ export function postMatch(app: AppActions, m: Match, mode: MatchMode, extra: Pos
   }
 
   let items: NavItem[];
-  if (mode === 'tournament') {
+  let statusEl: HTMLElement | null = null;
+  if (online) {
+    const rem = button(t('post.rematch'), () => online.rematch(), 'btn btn-go');
+    items = [rem, button(t('post.change'), () => online.change()), button(t('online.leave'), () => online.leave(), 'btn btn-alt')];
+    const status = h('div', 'net-status info');
+    statusEl = status;
+    online.bind((text, iWant) => {
+      status.textContent = text;
+      status.style.visibility = text ? 'visible' : 'hidden';
+      const label = rem.el.querySelector('.btn-label');
+      if (label) label.textContent = iWant ? t('online.rematchCancel') : t('post.rematch');
+      rem.el.classList.toggle('btn-go', !iWant);
+      rem.el.classList.toggle('btn-alt', iWant);
+    });
+  } else if (mode === 'tournament') {
     const won = m.winner === 0;
     items = won
       ? [button(t('post.continue'), () => extra.onContinue?.(), 'btn btn-go'), button(t('post.menu'), () => app.quitToMenu(), 'btn btn-alt')]
@@ -271,7 +300,8 @@ export function postMatch(app: AppActions, m: Match, mode: MatchMode, extra: Pos
       button(t('post.menu'), () => app.quitToMenu(), 'btn btn-alt'),
     ];
   }
+  if (statusEl) box.append(statusEl);
   box.append(h('div', 'row-buttons', undefined, items.map((i) => i.el)));
   if (!app.touchMode) box.append(hints(t('post.hints')));
-  return { id: 'post', root, items, back: () => app.quitToMenu() };
+  return { id: 'post', root, items, back: online ? () => {} : () => app.quitToMenu() };
 }

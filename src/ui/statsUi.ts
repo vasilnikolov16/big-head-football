@@ -37,6 +37,7 @@ export function statsScreen(career: Career, ui: UI, back: () => void, tab: Tab =
       [t('stats.played'), String(st.played)],
       [t('stats.cpuRecord'), `${st.cpuWon} / ${st.cpuLost}`],
       [t('stats.pvp'), String(st.pvpPlayed)],
+      [t('stats.online'), `${st.onlineWon} / ${st.onlineLost}`],
       [t('stats.goals'), String(st.goals)],
       [t('stats.conceded'), String(st.conceded)],
       [t('stats.supers'), String(st.supers)],

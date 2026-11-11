@@ -20,6 +20,12 @@ export interface Settings {
   /** on-screen touch buttons */
   touch: 'auto' | 'on' | 'off';
   showFps: boolean;
+  /** online: player name shown to the other player */
+  onlineName: string;
+  /** online: how far behind the guest plays the stream (smoothness vs delay) */
+  netBuffer: 'fast' | 'normal' | 'smooth';
+  /** online: ping in the corner during matches */
+  showPing: boolean;
   /** settings format version (for migrations) */
   version: number;
 }
@@ -41,6 +47,9 @@ const defaults = (): Settings => ({
   lang: 'bg',
   touch: 'auto',
   showFps: false,
+  onlineName: '',
+  netBuffer: 'normal',
+  showPing: true,
   version: VERSION,
 });
 
@@ -91,6 +100,9 @@ export function loadSettings(): Settings {
   if (s.lang !== 'bg' && s.lang !== 'en') s.lang = 'bg';
   if (!['auto', 'on', 'off'].includes(s.touch)) s.touch = 'auto';
   s.showFps = s.showFps === true;
+  s.onlineName = typeof s.onlineName === 'string' ? s.onlineName.slice(0, 14) : '';
+  if (!['fast', 'normal', 'smooth'].includes(s.netBuffer)) s.netBuffer = 'normal';
+  s.showPing = s.showPing !== false;
   return s;
 }
 

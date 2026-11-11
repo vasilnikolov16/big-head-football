@@ -29,6 +29,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'rout', icon: '💥', name: { bg: 'Разгром', en: 'Rout' }, desc: { bg: 'Спечели с 5 или повече гола разлика.', en: 'Win by 5 or more goals.' } },
   { id: 'no_mercy', icon: '😈', name: { bg: 'Без милост', en: 'No mercy' }, desc: { bg: 'Победи компютъра на „Трудно“.', en: 'Beat the computer on Hard.' } },
   { id: 'streak3', icon: '🔥', name: { bg: 'В серия', en: 'On fire' }, desc: { bg: '3 поредни победи срещу компютъра.', en: '3 wins in a row against the computer.' } },
+  { id: 'online_win', icon: '🌐', name: { bg: 'Световна звезда', en: 'World star' }, desc: { bg: 'Спечели онлайн мач.', en: 'Win an online match.' } },
   { id: 'friendly', icon: '🤝', name: { bg: 'Приятелски мач', en: 'Friendly' }, desc: { bg: 'Изиграй мач за двама.', en: 'Play a two-player match.' } },
   { id: 'veteran', icon: '🎖️', name: { bg: 'Ветеран', en: 'Veteran' }, desc: { bg: 'Изиграй 25 мача.', en: 'Play 25 matches.' } },
   { id: 'champion', icon: '🏆', name: { bg: 'Шампион', en: 'Champion' }, desc: { bg: 'Спечели турнира.', en: 'Win the tournament.' } },
@@ -39,7 +40,7 @@ export const ACHIEVEMENTS: Achievement[] = [
 export const TOURNAMENT_DIFFICULTY = (round: number): Difficulty => (round < 2 ? 'easy' : round < 5 ? 'medium' : 'hard');
 
 export interface MatchInfo {
-  mode: 'cpu' | 'pvp' | 'tournament';
+  mode: 'cpu' | 'pvp' | 'tournament' | 'online';
   /** indices of the human players */
   humans: number[];
   heroes: [string, string];
@@ -113,9 +114,10 @@ export class Career {
     const st = this.p.stats;
     const s = info.summary;
     const res: CareerResult = { achievements: [], unlockedHeroes: [], roundWon: false, cupWon: false, flawless: false };
-    const vsCpu = info.mode !== 'pvp';
+    const vsCpu = info.mode === 'cpu' || info.mode === 'tournament';
+    const online = info.mode === 'online';
     st.played++;
-    if (!vsCpu) {
+    if (info.mode === 'pvp') {
       st.pvpPlayed++;
       this.award('friendly', res.achievements);
     }
@@ -126,7 +128,7 @@ export class Career {
       const against = s.score[o];
       const won = s.winner === h;
       st.goals += goals;
-      st.conceded += vsCpu ? against : 0;
+      st.conceded += vsCpu || online ? against : 0;
       st.supers += s.supers[h];
       st.powerups += s.powerups[h];
       st.perfectKicks += s.perfectKicks[h];
@@ -139,6 +141,13 @@ export class Career {
       }
       if (s.superGoals[h] > 0 && !st.superGoalHeroes.includes(info.heroes[h])) st.superGoalHeroes.push(info.heroes[h]);
 
+      if (online) {
+        st.onlinePlayed++;
+        if (won) {
+          st.onlineWon++;
+          this.award('online_win', res.achievements);
+        } else if (s.winner === o) st.onlineLost++;
+      }
       if (vsCpu) {
         if (won) {
           st.cpuWon++;

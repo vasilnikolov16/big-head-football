@@ -11,10 +11,11 @@ import {
   RESERVED_KEYS,
   type Action,
 } from '../input/controls';
-import { button, h, keycap, optionRow, sliderRow, type NavItem, type Screen, type UI } from './ui';
+import { cleanName, MAX_NAME } from '../net/protocol';
+import { button, h, keycap, optionRow, sliderRow, textRow, type NavItem, type Screen, type UI } from './ui';
 
-export type SettingsTab = 'sound' | 'game' | 'controls' | 'language';
-const TABS: SettingsTab[] = ['sound', 'game', 'controls', 'language'];
+export type SettingsTab = 'sound' | 'game' | 'controls' | 'online' | 'language';
+const TABS: SettingsTab[] = ['sound', 'game', 'controls', 'online', 'language'];
 
 /** The part of the game the settings screen talks to. */
 export interface SettingsHost {
@@ -153,6 +154,43 @@ function gameTab(host: SettingsHost): TabContent {
   const el = h('div', 'tab-body two-col');
   el.append(dur.el, diff.el, set.el, bonuses.el, replays.el, touch.el, fps.el, h('div', 'row-buttons', undefined, [reset.el]));
   return { el, items: [dur, diff, set, bonuses, replays, touch, fps, reset] };
+}
+
+function onlineTab(host: SettingsHost): TabContent {
+  const s = host.settings;
+  const changed = (): void => {
+    host.saveSettings();
+    host.onSettingsChanged();
+  };
+  const name = textRow(t('settings.onlineName'), () => s.onlineName, (v) => {
+    s.onlineName = v.slice(0, MAX_NAME);
+    host.saveSettings();
+  }, { max: MAX_NAME, placeholder: t('online.namePh') });
+  name.input.addEventListener('blur', () => {
+    s.onlineName = cleanName(name.input.value);
+    name.input.value = s.onlineName;
+    host.saveSettings();
+  });
+  const buffer = optionRow<'fast' | 'normal' | 'smooth'>(
+    t('settings.netBuffer'),
+    [
+      { value: 'fast', label: t('buf.fast') },
+      { value: 'normal', label: t('buf.normal') },
+      { value: 'smooth', label: t('buf.smooth') },
+    ],
+    () => s.netBuffer,
+    (v) => {
+      s.netBuffer = v;
+      changed();
+    },
+  );
+  const ping = optionRow(t('settings.showPing'), onOff(), () => s.showPing, (v) => {
+    s.showPing = v;
+    changed();
+  });
+  const el = h('div', 'tab-body');
+  el.append(name.el, buffer.el, h('p', 'desc small', t('settings.netBufferDesc')), ping.el);
+  return { el, items: [name, buffer, ping] };
 }
 
 function languageTab(host: SettingsHost, rerender: () => void): TabContent {
@@ -327,7 +365,9 @@ export function settingsScreen(host: SettingsHost, back: () => void, tab: Settin
         ? gameTab(host)
         : tab === 'controls'
           ? controlsTab(host)
-          : languageTab(host, () => host.ui.show(settingsScreen(host, back, 'language', true), true));
+          : tab === 'online'
+            ? onlineTab(host)
+            : languageTab(host, () => host.ui.show(settingsScreen(host, back, 'language', true), true));
   box.append(content.el);
 
   const done = button(t('done'), back, 'btn btn-go btn-small');

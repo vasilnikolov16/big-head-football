@@ -183,7 +183,7 @@ export class PowerUps {
       color: info.color,
       good: true,
     });
-    m.callout = { text: tr(info.name).toUpperCase() + '!', color: info.color, player: p.index, t: 0 };
+    m.callout = { text: tr(info.name).toUpperCase() + '!', color: info.color, player: p.index, t: 0, ref: { kind: 'power', id: it.type } };
   }
 
   private end(m: Match, e: ActiveEffect): void {

@@ -6,9 +6,31 @@ import { keyLabel, type MenuKeys } from '../input/controls';
 import { drawHead, drawPlayer } from '../render/playerDraw';
 import { h, type Screen, type UiSound } from './ui';
 
+/** Online: each browser controls one side, the other side mirrors the network. */
+export interface OnlineSelect {
+  /** the side this browser controls */
+  side: 0 | 1;
+  isHost: boolean;
+  names: [string, string];
+  /** the local pick changed */
+  send: (hero: string, ready: boolean) => void;
+  /** host pressed START with both ready */
+  requestStart: () => void;
+  /** hands the session a way to push the other player's picks */
+  bind: (api: OnlineSelectApi) => void;
+}
+
+export interface OnlineSelectApi {
+  setRemote(hero: string, ready: boolean): void;
+  unreadyLocal(): void;
+  /** both browsers: play the VS splash and start */
+  launch(heroes: [string, string]): void;
+}
+
 export interface HeroSelectOptions {
   /** tournament = pick only your own hero */
-  mode: 'cpu' | 'pvp' | 'tournament';
+  mode: 'cpu' | 'pvp' | 'tournament' | 'online';
+  online?: OnlineSelect;
   /** hero ids pre-selected for [left, right] */
   initial: [string, string];
   isLocked: (c: CharacterDef) => boolean;
@@ -73,10 +95,18 @@ export function heroSelect(o: HeroSelectOptions): Screen {
   let launching = false;
   const tour = o.mode === 'tournament';
   const cpu = o.mode === 'cpu' || tour;
+  const online = o.mode === 'online' ? (o.online ?? null) : null;
+  const me: 0 | 1 = online?.side ?? 0;
+  const them: 0 | 1 = me === 0 ? 1 : 0;
+  const short = (n: string): string => (n.length > 7 ? n.slice(0, 6) + '…' : n);
+  const sideLabel = (i: 0 | 1, card: boolean): string =>
+    online ? (i === me ? t('you') : card ? short(online.names[i]) : online.names[i]) : i === 0 ? (cpu ? t('you') : 'P1') : cpu ? t('cpu') : 'P2';
   const allReady = (): boolean => ready[0] && (tour || ready[1]);
   // the first available hero if the saved one is locked
   const firstFree = (): number => Math.max(0, chars.findIndex((c) => !o.isLocked(c)));
-  if (o.isLocked(chars[cursor[0]])) cursor[0] = firstFree();
+  if (o.isLocked(chars[cursor[me]])) cursor[me] = firstFree();
+  /** the local player changed something: tell the other browser */
+  const notify = (): void => online?.send(chars[cursor[me]].id, ready[me]);
 
   const root = h('div', `scr scr-select mode-${o.mode}`);
   const title = h('h2', 'sel-title', t('sel.pickHero'));
@@ -88,7 +118,7 @@ export function heroSelect(o: HeroSelectOptions): Screen {
   // ---------------------------------------------------------------- side panels
   const makeSide = (i: 0 | 1): Side => {
     const el = h('div', `sel-side s${i}`);
-    const badge = h('div', 'sel-badge', i === 0 ? (cpu ? t('you') : 'P1') : cpu ? t('cpu') : 'P2');
+    const badge = h('div', 'sel-badge', sideLabel(i, false));
     const canvas = makeCanvas(250, 220, 'sel-preview');
     const name = h('div', 'sel-name');
     const stamp = h('div', 'sel-ready', t('sel.stamp'));
@@ -128,7 +158,7 @@ export function heroSelect(o: HeroSelectOptions): Screen {
       card.classList.add('locked');
       card.append(h('div', 'lock', '🔒'));
     }
-    card.append(h('div', 'cur-badge b1', cpu ? t('you') : 'P1'), h('div', 'cur-badge b2', cpu ? t('cpu') : 'P2'));
+    card.append(h('div', 'cur-badge b1', sideLabel(0, true)), h('div', 'cur-badge b2', sideLabel(1, true)));
     card.addEventListener('click', () => onCardClick(i));
     grid.append(card);
     const portrait = new Player(0, c);
@@ -148,7 +178,16 @@ export function heroSelect(o: HeroSelectOptions): Screen {
 
   // ---------------------------------------------------------------- state -> DOM
   const refresh = (): void => {
-    if (cpu) {
+    if (online) {
+      const other = online.names[them];
+      title.textContent = allReady() ? t('sel.allReady') : t('online.selTitle');
+      subtitle.textContent = allReady() ? (online.isHost ? t('online.pressStartHost') : t('online.pressStartGuest')) : t('online.selSub', { n: other });
+      hints.textContent = t('online.selHint');
+      startBtn.textContent = allReady() ? (online.isHost ? t('sel.start') : t('online.waitHost')) : ready[me] ? t('online.waitOpp', { n: other }) : t('sel.waitBoth');
+      const go = allReady() && online.isHost;
+      startBtn.classList.toggle('disabled', !go);
+      startBtn.classList.toggle('sel', go);
+    } else if (cpu) {
       title.textContent = allReady() ? t('sel.allReady') : tour ? t('sel.tournament') : step === 0 ? t('sel.pickHero') : t('sel.pickOpp');
       subtitle.textContent = allReady() ? t('sel.pressStart') : step === 0 ? t('sel.browse') : t('sel.vsWho', { l: o.rightLabel });
       hints.textContent = allReady() ? t('sel.hint.ready') : step === 0 ? t('sel.hint.cpu0') : t('sel.hint.cpu1');
@@ -159,9 +198,11 @@ export function heroSelect(o: HeroSelectOptions): Screen {
         ? t('sel.hint.pvpReady', { a: keyLabel(o.keys[0].ok[0]), b: keyLabel(o.keys[1].ok[0]) })
         : t('sel.hint.pvp', { a: keysText(o.keys[0]), b: keysText(o.keys[1]) });
     }
-    startBtn.textContent = allReady() ? t('sel.start') : cpu ? t('sel.pickBoth') : t('sel.waitBoth');
-    startBtn.classList.toggle('disabled', !allReady());
-    startBtn.classList.toggle('sel', allReady());
+    if (!online) {
+      startBtn.textContent = allReady() ? t('sel.start') : cpu ? t('sel.pickBoth') : t('sel.waitBoth');
+      startBtn.classList.toggle('disabled', !allReady());
+      startBtn.classList.toggle('sel', allReady());
+    }
 
     cards.forEach(({ card }, i) => {
       const show2 = !cpu || step === 1 || ready[1];
@@ -176,7 +217,7 @@ export function heroSelect(o: HeroSelectOptions): Screen {
       const hiddenRight = cpu && i === 1 && (step === 0 || tour);
       s.root.classList.toggle('waiting', hiddenRight);
       s.root.classList.toggle('ready', ready[i]);
-      const active = !cpu || (i === 0 ? step === 0 : step === 1);
+      const active = online ? i === me : !cpu || (i === 0 ? step === 0 : step === 1);
       s.root.classList.toggle('active', active && !ready[i]);
       if (s.heroId !== c.id) {
         s.heroId = c.id;
@@ -186,7 +227,8 @@ export function heroSelect(o: HeroSelectOptions): Screen {
         void s.root.offsetWidth;
         s.root.classList.add('swap');
       }
-      const locked = o.isLocked(c);
+      // the other online player has their own unlocks
+      const locked = online && i === them ? false : o.isLocked(c);
       s.name.textContent = hiddenRight ? (tour ? t('tour.title') : '???') : tr(c.name);
       s.tagline.textContent = hiddenRight ? (tour ? '' : t('sel.firstPick')) : locked ? '🔒 ' + t('sel.locked') : tr(c.tagline);
       s.root.classList.toggle('locked', !hiddenRight && locked);
@@ -202,7 +244,7 @@ export function heroSelect(o: HeroSelectOptions): Screen {
       s.readyBtn.textContent = ready[i] ? t('sel.change') : t('sel.ready');
       s.readyBtn.classList.toggle('btn-alt', ready[i]);
       s.readyBtn.classList.toggle('btn-go', !ready[i]);
-      s.readyBtn.style.visibility = hiddenRight ? 'hidden' : 'visible';
+      s.readyBtn.style.visibility = hiddenRight || (online && i === them) ? 'hidden' : 'visible';
     }
   };
 
@@ -229,6 +271,7 @@ export function heroSelect(o: HeroSelectOptions): Screen {
     ready[i] = true;
     o.sound('select');
     sides[i].player.setExpression('happy', 1.2);
+    if (online && i === me) notify();
     if (cpu && i === 0 && !tour) {
       step = 1;
       if (cursor[1] === cursor[0] || o.isLocked(chars[cursor[1]])) {
@@ -246,6 +289,7 @@ export function heroSelect(o: HeroSelectOptions): Screen {
       step = 0;
     }
     o.sound('back');
+    if (online && i === me) notify();
     refresh();
   };
 
@@ -256,6 +300,7 @@ export function heroSelect(o: HeroSelectOptions): Screen {
       start();
       return;
     }
+    if (online && i !== me) return;
     if (ready[i]) unready(i);
     else setReady(i);
   };
@@ -267,11 +312,11 @@ export function heroSelect(o: HeroSelectOptions): Screen {
     if (dy) c = (c + dy * COLS + chars.length) % chars.length;
     cursor[i] = c;
     o.sound('move');
+    if (online && i === me) notify();
     refresh();
   };
 
-  const start = (): void => {
-    if (!allReady() || launching) return;
+  const launch = (): void => {
     launching = true;
     o.sound('select');
     vs.innerHTML = '';
@@ -281,8 +326,19 @@ export function heroSelect(o: HeroSelectOptions): Screen {
     window.setTimeout(() => o.onDone(chars[cursor[0]], chars[cursor[1]]), 1100);
   };
 
+  const start = (): void => {
+    if (!allReady() || launching) return;
+    if (online) {
+      // the host asks the session; the session starts both browsers together
+      if (online.isHost) online.requestStart();
+      return;
+    }
+    launch();
+  };
+
   function onReadyClick(i: 0 | 1): void {
     if (launching) return;
+    if (online && i !== me) return;
     if (ready[i]) unready(i);
     else if (!cpu || (i === 0 ? step === 0 : step === 1)) setReady(i);
   }
@@ -291,7 +347,10 @@ export function heroSelect(o: HeroSelectOptions): Screen {
   function onCardClick(i: number): void {
     if (launching) return;
     let who: 0 | 1;
-    if (cpu) {
+    if (online) {
+      if (allReady() || ready[me]) return;
+      who = me;
+    } else if (cpu) {
       if (allReady()) return;
       who = step === 0 ? 0 : 1;
     } else {
@@ -316,6 +375,18 @@ export function heroSelect(o: HeroSelectOptions): Screen {
 
   const onKey = (code: string): boolean => {
     if (launching) return true;
+    if (online) {
+      if (code === 'Escape') {
+        if (ready[me]) unready(me);
+        else o.onBack();
+        return true;
+      }
+      const d = dirOf(o.keys[0], code) ?? dirOf(o.keys[1], code) ?? dirOf(FALLBACK, code);
+      if (d) move(me, d[0], d[1]);
+      else if (['Enter', 'NumpadEnter', 'Space', ...o.keys[0].ok, ...o.keys[1].ok].includes(code)) confirm(me);
+      else if (code === 'Backspace') unready(me);
+      return true;
+    }
     if (code === 'Escape') {
       if (cpu) {
         if (ready[1]) unready(1);
@@ -409,6 +480,39 @@ export function heroSelect(o: HeroSelectOptions): Screen {
     raf = requestAnimationFrame(frame);
   };
   raf = requestAnimationFrame(frame);
+
+  if (online) {
+    online.bind({
+      setRemote: (hero, r) => {
+        const i = chars.findIndex((c) => c.id === hero);
+        if (i < 0 || launching) return;
+        if (cursor[them] !== i) o.sound('move');
+        cursor[them] = i;
+        if (r && !ready[them]) sides[them].player.setExpression('happy', 1.2);
+        ready[them] = r;
+        refresh();
+      },
+      unreadyLocal: () => {
+        if (!ready[me] || launching) return;
+        ready[me] = false;
+        o.sound('back');
+        shake(me);
+        notify();
+        refresh();
+      },
+      launch: (heroes) => {
+        if (launching) return;
+        for (const i of [0, 1] as const) {
+          const k = chars.findIndex((c) => c.id === heroes[i]);
+          if (k >= 0) cursor[i] = k;
+        }
+        ready[0] = ready[1] = true;
+        refresh();
+        launch();
+      },
+    });
+    notify();
+  }
 
   refresh();
   return {
