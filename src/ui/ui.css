@@ -1178,9 +1178,29 @@
   --edge: 26px;
   --low: 16px;
   --gap: 12px;
-  --mw: 150px;
-  --aw: 160px;
-  --bh: 82px;
+  --mw: calc(150px * var(--tsize, 1));
+  --aw: calc(160px * var(--tsize, 1));
+  --bh: calc(82px * var(--tsize, 1));
+}
+.touch-pad .tbtn {
+  opacity: var(--topac, 0.8);
+}
+/* layout editor: above the menu screen, buttons can be dragged */
+.touch-pad.editing {
+  z-index: 4;
+}
+.touch-pad.editing .tbtn {
+  opacity: 1;
+  filter: none;
+  animation: none;
+  cursor: grab;
+  outline: 3px dashed rgba(255, 255, 255, 0.7);
+  outline-offset: 5px;
+}
+.touch-pad.editing .tbtn.dragging {
+  cursor: grabbing;
+  outline-color: var(--gold);
+  transform: scale(1.06);
 }
 .tbtn {
   position: absolute;
@@ -1213,7 +1233,7 @@
 }
 .tb-label {
   font-family: var(--display);
-  font-size: 26px;
+  font-size: calc(26px * var(--tsize, 1));
   letter-spacing: 0.5px;
   text-transform: uppercase;
 }
@@ -1227,7 +1247,7 @@
   bottom: calc(var(--sb) + var(--low));
   width: var(--mw);
   height: var(--bh);
-  font-size: 44px;
+  font-size: calc(44px * var(--tsize, 1));
 }
 .tb-left {
   left: calc(var(--sl) + var(--edge));
@@ -1248,12 +1268,12 @@
 .tb-kick {
   right: calc(var(--sr) + var(--edge) + var(--aw) + var(--gap));
 }
-.tb-super {
+.touch-pad .tb-super {
   right: calc(var(--sr) + var(--edge) + (var(--aw) + var(--gap)) * 2);
-  opacity: 0.5;
+  opacity: calc(var(--topac, 0.8) * 0.6);
   filter: saturate(0.4);
 }
-.tb-super.ready {
+.touch-pad .tb-super.ready {
   opacity: 1;
   filter: none;
   border-color: #fff3b0;
@@ -1297,23 +1317,36 @@
   background: rgba(0, 0, 0, 0.3);
   font-size: 22px;
 }
+.td-l,
+.td-r {
+  width: 64px;
+  height: 44px;
+  border-radius: 14px;
+}
 .td-l {
   left: 0;
 }
 .td-r {
-  left: 62px;
+  left: 72px;
+}
+.td-j,
+.td-k,
+.td-s {
+  width: 84px;
+  height: 44px;
+  border-radius: 14px;
+  font-family: var(--display);
+  font-size: 14px;
+  text-transform: uppercase;
 }
 .td-j {
   right: 0;
-  border-radius: 16px;
 }
 .td-k {
-  right: 62px;
-  border-radius: 16px;
+  right: 92px;
 }
 .td-s {
-  right: 124px;
-  border-radius: 16px;
+  right: 184px;
   border-color: var(--gold);
 }
 
@@ -1908,4 +1941,50 @@
 }
 .corner-back:active {
   transform: scale(0.94);
+}
+
+/* tall panels scroll instead of being cut off (a phone screen is short) */
+.scr-panel > .panel {
+  max-height: calc(100% - 28px);
+  display: flex;
+  flex-direction: column;
+}
+.scr-panel > .panel > * {
+  flex-shrink: 0;
+}
+.scr-panel > .panel > .panel-body,
+.scr-panel > .panel > .tab-body {
+  flex-shrink: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 210, 63, 0.6) transparent;
+  padding-right: 8px;
+  margin-right: -8px;
+}
+.scr-panel > .panel > .tab-body {
+  min-height: 0;
+}
+
+/* button layout editor */
+.screen.scr-touchedit {
+  pointer-events: none;
+  background: rgba(5, 4, 18, 0.35);
+}
+.scr-touchedit .edit-panel {
+  pointer-events: auto;
+  position: absolute;
+  left: 50%;
+  top: 90px;
+  transform: translateX(-50%);
+  min-width: 0;
+  width: 600px;
+  padding: 18px 30px 22px;
+}
+.scr-touchedit .edit-panel .panel-title {
+  font-size: 32px;
+  margin-bottom: 8px;
 }

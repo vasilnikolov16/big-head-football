@@ -148,7 +148,11 @@ export class Fx {
     this.emotes.push({ player, icon, t: 0 });
   }
 
+  /** settings: screen shake on/off */
+  shakeOn = true;
+
   addShake(a: number): void {
+    if (!this.shakeOn) return;
     this.shake = Math.min(22, Math.max(this.shake, a));
   }
 

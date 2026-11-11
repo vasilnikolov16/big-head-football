@@ -2,6 +2,9 @@ import type { Difficulty } from '../ai/aiController';
 import type { Lang } from '../i18n/i18n';
 import { ACTIONS, cloneBinding, DEFAULT_P1, DEFAULT_P2, type Binding } from '../input/controls';
 
+/** where the player put each on-screen button: centre as a fraction of the screen */
+export type TouchLayout = Partial<Record<'left' | 'right' | 'super' | 'kick' | 'jump' | 'pause', { x: number; y: number }>>;
+
 export interface Settings {
   duration: 30 | 60 | 90;
   /** which control set the human uses against the computer */
@@ -14,12 +17,24 @@ export interface Settings {
   /** 0..1 */
   sfxVolume: number;
   musicVolume: number;
+  /** crowd noise, 0..1 */
+  crowdVolume: number;
   powerups: boolean;
   replays: boolean;
   lang: Lang;
   /** on-screen touch buttons */
   touch: 'auto' | 'on' | 'off';
   showFps: boolean;
+  /** screen shake on hits and goals */
+  shake: boolean;
+  /** super shot cinematic (zoom, darkening, the hero strip) */
+  cinematic: boolean;
+  /** render resolution: high = sharpest, saver = easier on the battery */
+  quality: 'high' | 'normal' | 'saver';
+  /** on-screen buttons */
+  touchSize: 'small' | 'normal' | 'large';
+  touchOpacity: 'solid' | 'normal' | 'clear';
+  touchLayout: TouchLayout;
   /** online: player name shown to the other player */
   onlineName: string;
   /** online: how far behind the guest plays the stream (smoothness vs delay) */
@@ -42,11 +57,18 @@ const defaults = (): Settings => ({
   controls: { p1: cloneBinding(DEFAULT_P1), p2: cloneBinding(DEFAULT_P2) },
   sfxVolume: 0.8,
   musicVolume: 0.5,
+  crowdVolume: 0.7,
   powerups: true,
   replays: false,
   lang: 'bg',
   touch: 'auto',
   showFps: false,
+  shake: true,
+  cinematic: true,
+  quality: 'high',
+  touchSize: 'normal',
+  touchOpacity: 'normal',
+  touchLayout: {},
   onlineName: '',
   netBuffer: 'normal',
   showPing: true,
@@ -76,6 +98,18 @@ function validBinding(b: unknown): b is Binding {
   return ACTIONS.every((a) => Array.isArray(o[a]) && (o[a] as unknown[]).length > 0 && (o[a] as unknown[]).every((k) => typeof k === 'string'));
 }
 
+const LAYOUT_KEYS = ['left', 'right', 'super', 'kick', 'jump', 'pause'] as const;
+
+function validLayout(v: unknown): TouchLayout {
+  const out: TouchLayout = {};
+  if (!v || typeof v !== 'object') return out;
+  for (const k of LAYOUT_KEYS) {
+    const p = (v as Record<string, { x?: unknown; y?: unknown }>)[k];
+    if (p && typeof p.x === 'number' && typeof p.y === 'number' && p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1) out[k] = { x: p.x, y: p.y };
+  }
+  return out;
+}
+
 const clamp01 = (v: unknown, d: number): number => (typeof v === 'number' && v >= 0 && v <= 1 ? v : d);
 
 export function loadSettings(): Settings {
@@ -100,6 +134,13 @@ export function loadSettings(): Settings {
   if (s.lang !== 'bg' && s.lang !== 'en') s.lang = 'bg';
   if (!['auto', 'on', 'off'].includes(s.touch)) s.touch = 'auto';
   s.showFps = s.showFps === true;
+  s.crowdVolume = clamp01(s.crowdVolume, d.crowdVolume);
+  s.shake = s.shake !== false;
+  s.cinematic = s.cinematic !== false;
+  if (!['high', 'normal', 'saver'].includes(s.quality)) s.quality = 'high';
+  if (!['small', 'normal', 'large'].includes(s.touchSize)) s.touchSize = 'normal';
+  if (!['solid', 'normal', 'clear'].includes(s.touchOpacity)) s.touchOpacity = 'normal';
+  s.touchLayout = validLayout(saved.touchLayout);
   s.onlineName = typeof s.onlineName === 'string' ? s.onlineName.slice(0, 14) : '';
   if (!['fast', 'normal', 'smooth'].includes(s.netBuffer)) s.netBuffer = 'normal';
   s.showPing = s.showPing !== false;

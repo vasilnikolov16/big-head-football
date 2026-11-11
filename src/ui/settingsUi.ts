@@ -14,8 +14,8 @@ import {
 import { cleanName, MAX_NAME } from '../net/protocol';
 import { button, h, keycap, optionRow, sliderRow, textRow, type NavItem, type Screen, type UI } from './ui';
 
-export type SettingsTab = 'sound' | 'game' | 'controls' | 'online' | 'language';
-const TABS: SettingsTab[] = ['sound', 'game', 'controls', 'online', 'language'];
+export type SettingsTab = 'sound' | 'game' | 'display' | 'buttons' | 'controls' | 'online' | 'language';
+const TABS: SettingsTab[] = ['sound', 'game', 'display', 'buttons', 'controls', 'online', 'language'];
 
 /** The part of the game the settings screen talks to. */
 export interface SettingsHost {
@@ -24,6 +24,10 @@ export interface SettingsHost {
   saveSettings(): void;
   onSettingsChanged(): void;
   resetProgress(): void;
+  /** phone / tablet buttons are in use */
+  readonly touchMode: boolean;
+  /** opens the on-screen button layout editor */
+  editTouchLayout(back: () => void): void;
 }
 
 interface TabContent {
@@ -96,9 +100,13 @@ function soundTab(host: SettingsHost): TabContent {
     s.musicVolume = v;
     changed();
   });
+  const crowd = sliderRow(t('settings.crowd'), () => s.crowdVolume, (v) => {
+    s.crowdVolume = v;
+    changed();
+  });
   const el = h('div', 'tab-body');
-  el.append(sfx.el, music.el);
-  return { el, items: [sfx, music] };
+  el.append(sfx.el, music.el, crowd.el);
+  return { el, items: [sfx, music, crowd] };
 }
 
 function gameTab(host: SettingsHost): TabContent {
@@ -118,21 +126,8 @@ function gameTab(host: SettingsHost): TabContent {
     s.replays = v;
     changed();
   });
-  const touch = optionRow<'auto' | 'on' | 'off'>(
-    t('settings.touch'),
-    [
-      { value: 'auto', label: t('auto') },
-      { value: 'on', label: t('on') },
-      { value: 'off', label: t('off') },
-    ],
-    () => s.touch,
-    (v) => {
-      s.touch = v;
-      changed();
-    },
-  );
-  const fps = optionRow(t('settings.fps'), onOff(), () => s.showFps, (v) => {
-    s.showFps = v;
+  const cinematic = optionRow(t('settings.cinematic'), onOff(), () => s.cinematic, (v) => {
+    s.cinematic = v;
     changed();
   });
   let armed = false;
@@ -151,9 +146,111 @@ function gameTab(host: SettingsHost): TabContent {
     },
     'btn btn-alt btn-small btn-danger',
   );
-  const el = h('div', 'tab-body two-col');
-  el.append(dur.el, diff.el, set.el, bonuses.el, replays.el, touch.el, fps.el, h('div', 'row-buttons', undefined, [reset.el]));
-  return { el, items: [dur, diff, set, bonuses, replays, touch, fps, reset] };
+  const el = h('div', 'tab-body');
+  // the keyboard set against the computer only matters with a keyboard
+  const rows = host.touchMode ? [dur, diff, bonuses, replays, cinematic] : [dur, diff, set, bonuses, replays, cinematic];
+  el.append(...rows.map((r) => r.el), h('div', 'row-buttons', undefined, [reset.el]));
+  return { el, items: [...rows, reset] };
+}
+
+function displayTab(host: SettingsHost): TabContent {
+  const s = host.settings;
+  const changed = (): void => {
+    host.saveSettings();
+    host.onSettingsChanged();
+  };
+  const shake = optionRow(t('settings.shake'), onOff(), () => s.shake, (v) => {
+    s.shake = v;
+    changed();
+  });
+  const quality = optionRow<'high' | 'normal' | 'saver'>(
+    t('settings.quality'),
+    [
+      { value: 'high', label: t('q.high') },
+      { value: 'normal', label: t('q.normal') },
+      { value: 'saver', label: t('q.saver') },
+    ],
+    () => s.quality,
+    (v) => {
+      s.quality = v;
+      changed();
+    },
+  );
+  const fps = optionRow(t('settings.fps'), onOff(), () => s.showFps, (v) => {
+    s.showFps = v;
+    changed();
+  });
+  const el = h('div', 'tab-body');
+  el.append(shake.el, quality.el, h('p', 'desc small', t('settings.qualityDesc')), fps.el);
+  return { el, items: [shake, quality, fps] };
+}
+
+function buttonsTab(host: SettingsHost, rerender: () => void): TabContent {
+  const s = host.settings;
+  const changed = (): void => {
+    host.saveSettings();
+    host.onSettingsChanged();
+  };
+  const touch = optionRow<'auto' | 'on' | 'off'>(
+    t('settings.touch'),
+    [
+      { value: 'auto', label: t('auto') },
+      { value: 'on', label: t('on') },
+      { value: 'off', label: t('off') },
+    ],
+    () => s.touch,
+    (v) => {
+      s.touch = v;
+      changed();
+    },
+  );
+  const size = optionRow<'small' | 'normal' | 'large'>(
+    t('settings.touchSize'),
+    [
+      { value: 'small', label: t('size.small') },
+      { value: 'normal', label: t('size.normal') },
+      { value: 'large', label: t('size.large') },
+    ],
+    () => s.touchSize,
+    (v) => {
+      s.touchSize = v;
+      changed();
+    },
+  );
+  const opacity = optionRow<'solid' | 'normal' | 'clear'>(
+    t('settings.touchOpacity'),
+    [
+      { value: 'solid', label: t('op.solid') },
+      { value: 'normal', label: t('op.normal') },
+      { value: 'clear', label: t('op.clear') },
+    ],
+    () => s.touchOpacity,
+    (v) => {
+      s.touchOpacity = v;
+      changed();
+    },
+  );
+  const custom = Object.keys(s.touchLayout).length > 0;
+  const edit = button(t('settings.touchEdit'), () => host.editTouchLayout(rerender), 'btn btn-go btn-small');
+  const reset = button(
+    t('settings.touchReset'),
+    () => {
+      s.touchLayout = {};
+      changed();
+      rerender();
+    },
+    'btn btn-alt btn-small',
+    !custom,
+  );
+  const el = h('div', 'tab-body');
+  el.append(
+    touch.el,
+    size.el,
+    opacity.el,
+    h('p', 'desc small', t(custom ? 'settings.touchCustom' : 'settings.touchDesc')),
+    h('div', 'row-buttons', undefined, [edit.el, reset.el]),
+  );
+  return { el, items: [touch, size, opacity, edit, reset] };
 }
 
 function onlineTab(host: SettingsHost): TabContent {
@@ -363,6 +460,10 @@ export function settingsScreen(host: SettingsHost, back: () => void, tab: Settin
       ? soundTab(host)
       : tab === 'game'
         ? gameTab(host)
+        : tab === 'display'
+          ? displayTab(host)
+          : tab === 'buttons'
+            ? buttonsTab(host, () => host.ui.show(settingsScreen(host, back, 'buttons', false), true))
         : tab === 'controls'
           ? controlsTab(host)
           : tab === 'online'

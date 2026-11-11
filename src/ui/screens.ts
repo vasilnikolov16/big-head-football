@@ -145,9 +145,9 @@ function touchCard(): HTMLElement {
   for (const [cls, txt] of [
     ['l', '◀'],
     ['r', '▶'],
-    ['s', '⚡'],
-    ['k', '👟'],
-    ['j', '⬆'],
+    ['s', t('act.superShort')],
+    ['k', t('act.kick')],
+    ['j', t('act.jump')],
   ])
     demo.append(h('span', `td td-${cls}`, txt));
   card.append(demo, h('p', 'ctrl-label', t('howto.touch')));
@@ -157,17 +157,33 @@ function touchCard(): HTMLElement {
 export function howToPlay(app: AppActions, back: () => void): Screen {
   const { root, body } = panel(t('howto.title'), 'wide');
   const cards = h('div', 'ctrl-cards');
-  if (app.touchMode) cards.append(touchCard(), controlsCard(t('controls.p1'), '#ff4d4d', app.settings.controls.p1));
+  if (app.touchMode) cards.append(touchCard());
   else
     cards.append(
       controlsCard(t('controls.p1'), '#ff4d4d', app.settings.controls.p1),
       controlsCard(t('controls.p2'), '#2f8cff', app.settings.controls.p2),
     );
   const tips = h('ul', 'tips');
-  for (const k of ['howto.tip1', 'howto.tip2', 'howto.tip3', 'howto.tip4', 'howto.tip5', 'howto.tip8', 'howto.tip6', 'howto.tip7']) tips.append(h('li', '', t(k)));
+  // tip5 is about keyboard keys: not shown on phones
+  const tipKeys = ['howto.tip1', 'howto.tip8', 'howto.tip2', 'howto.tip3', 'howto.tip4', ...(app.touchMode ? [] : ['howto.tip5']), 'howto.tip6', 'howto.tip7'];
+  for (const k of tipKeys) tips.append(h('li', '', t(k)));
   const ok = button(t('howto.ok'), back, 'btn btn-go btn-small');
-  body.append(cards, tips, h('div', 'row-buttons', undefined, [ok.el]));
-  return { id: 'howto', root, items: [ok], back };
+  body.append(cards, tips);
+  // the button stays visible below the scrolling text
+  body.after(h('div', 'row-buttons', undefined, [ok.el]));
+  return {
+    id: 'howto',
+    root,
+    items: [ok],
+    back,
+    // the text scrolls: arrow keys move it
+    onKey: (code) => {
+      const dir = code === 'ArrowUp' || code === 'KeyW' ? -1 : code === 'ArrowDown' || code === 'KeyS' ? 1 : 0;
+      if (!dir) return false;
+      body.scrollBy({ top: dir * 90, behavior: 'smooth' });
+      return true;
+    },
+  };
 }
 
 // ------------------------------------------------------------------ pause

@@ -1,3 +1,4 @@
+import type { Settings, TouchLayout } from '../core/storage';
 import { t } from '../i18n/i18n';
 import { DoubleTap, emptyIntent, type Controller, type PlayerIntent } from './controls';
 
@@ -23,6 +24,12 @@ export class TouchControls implements Controller {
   onEmote: (i: number) => void = () => {};
   private emoteBtn: HTMLElement;
   private emoteRow: HTMLElement;
+  private pauseBtn: HTMLElement;
+  private layout: TouchLayout = {};
+  /** layout editor: buttons are dragged instead of pressed */
+  private editing = false;
+  private drag: { id: number; el: HTMLElement; key: keyof TouchLayout; dx: number; dy: number } | null = null;
+  private onLayoutChange: ((l: TouchLayout) => void) | null = null;
   /** first touch anywhere (used to switch on touch mode and go fullscreen) */
   onFirstTouch: () => void = () => {};
 
@@ -47,12 +54,14 @@ export class TouchControls implements Controller {
     this.relabel();
     const pause = document.createElement('div');
     pause.className = 'tbtn tb-pause';
+    pause.dataset.btn = 'pause';
     pause.innerHTML = '<span>❚❚</span>';
     pause.addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      this.onPause();
+      if (!this.editing) this.onPause();
     });
     root.append(pause);
+    this.pauseBtn = pause;
     // online emotes: a button that opens a row of emojis
     const emoteBtn = document.createElement('div');
     emoteBtn.className = 'tbtn tb-emote';
@@ -130,6 +139,10 @@ export class TouchControls implements Controller {
 
   private down = (e: PointerEvent): void => {
     e.preventDefault();
+    if (this.editing) {
+      this.startDrag(e);
+      return;
+    }
     const b = this.btnAt(e.clientX, e.clientY);
     this.fingers.set(e.pointerId, b);
     this.press(b);
@@ -141,6 +154,10 @@ export class TouchControls implements Controller {
   };
 
   private move = (e: PointerEvent): void => {
+    if (this.drag) {
+      if (e.pointerId === this.drag.id) this.dragTo(e);
+      return;
+    }
     if (!this.fingers.has(e.pointerId)) return;
     e.preventDefault();
     const was = this.fingers.get(e.pointerId) ?? null;
@@ -154,12 +171,90 @@ export class TouchControls implements Controller {
   };
 
   private up = (e: PointerEvent): void => {
+    if (this.drag && e.pointerId === this.drag.id) {
+      this.drag.el.classList.remove('dragging');
+      this.drag = null;
+      this.onLayoutChange?.({ ...this.layout });
+      return;
+    }
     const b = this.fingers.get(e.pointerId) ?? null;
     this.fingers.delete(e.pointerId);
     this.release(b);
   };
 
+  // ------------------------------------------------------------------ look & layout
+
+  /** size, see-through-ness and custom positions from the settings */
+  applySettings(s: Pick<Settings, 'touchSize' | 'touchOpacity' | 'touchLayout'>): void {
+    this.root.style.setProperty('--tsize', String(s.touchSize === 'small' ? 0.8 : s.touchSize === 'large' ? 1.25 : 1));
+    this.root.style.setProperty('--topac', String(s.touchOpacity === 'solid' ? 1 : s.touchOpacity === 'clear' ? 0.45 : 0.8));
+    this.layout = { ...s.touchLayout };
+    this.placeAll();
+  }
+
+  private elFor(k: keyof TouchLayout): HTMLElement | undefined {
+    return k === 'pause' ? this.pauseBtn : this.els.get(k);
+  }
+
+  private placeAll(): void {
+    for (const k of ['left', 'right', 'super', 'kick', 'jump', 'pause'] as const) {
+      const el = this.elFor(k);
+      if (!el) continue;
+      const p = this.layout[k];
+      if (p) {
+        el.style.left = `${p.x * 100}%`;
+        el.style.top = `${p.y * 100}%`;
+        el.style.right = el.style.bottom = 'auto';
+        el.style.translate = '-50% -50%';
+      } else {
+        el.style.left = el.style.top = el.style.right = el.style.bottom = el.style.translate = '';
+      }
+    }
+  }
+
+  /** Layout editor on/off: buttons can be dragged anywhere; changes are reported. */
+  setEditing(on: boolean, onChange: ((l: TouchLayout) => void) | null = null): void {
+    this.editing = on;
+    this.onLayoutChange = onChange;
+    this.drag = null;
+    this.root.classList.toggle('editing', on);
+    this.clear();
+    if (on) {
+      this.visible = false;
+      this.setVisible(true);
+      this.setEmotes(false);
+    }
+  }
+
+  private startDrag(e: PointerEvent): void {
+    const el = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest<HTMLElement>('.tbtn');
+    const key = el?.dataset.btn as keyof TouchLayout | undefined;
+    if (!el || !key || !['left', 'right', 'super', 'kick', 'jump', 'pause'].includes(key)) return;
+    const r = el.getBoundingClientRect();
+    this.drag = { id: e.pointerId, el, key, dx: e.clientX - (r.left + r.width / 2), dy: e.clientY - (r.top + r.height / 2) };
+    el.classList.add('dragging');
+    try {
+      this.root.setPointerCapture?.(e.pointerId);
+    } catch {
+      /* fine */
+    }
+    this.dragTo(e);
+  }
+
+  private dragTo(e: PointerEvent): void {
+    const d = this.drag!;
+    const pad = this.root.getBoundingClientRect();
+    const b = d.el.getBoundingClientRect();
+    const hw = b.width / 2 / pad.width;
+    const hh = b.height / 2 / pad.height;
+    const x = Math.min(1 - hw, Math.max(hw, (e.clientX - d.dx - pad.left) / pad.width));
+    const y = Math.min(1 - hh, Math.max(hh, (e.clientY - d.dy - pad.top) / pad.height));
+    this.layout[d.key] = { x: Math.round(x * 1000) / 1000, y: Math.round(y * 1000) / 1000 };
+    this.placeAll();
+  }
+
   setVisible(v: boolean): void {
+    if (this.editing && !v) return;
     if (v === this.visible) return;
     this.visible = v;
     this.root.style.display = v ? '' : 'none';

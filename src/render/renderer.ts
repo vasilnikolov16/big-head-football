@@ -58,11 +58,20 @@ export class Renderer {
   }
 
   private lastSize = '';
+  /** highest device-pixel ratio to render at (settings: quality) */
+  private maxDpr = 2;
+
+  setMaxDpr(v: number): void {
+    if (v === this.maxDpr) return;
+    this.maxDpr = v;
+    this.lastSize = '';
+    this.resize();
+  }
 
   resize(): void {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, this.maxDpr);
     // a window with no size yet (app still opening, hidden tab): try again on the next frame
     if (!(vw > 1 && vh > 1)) {
       this.lastSize = '';

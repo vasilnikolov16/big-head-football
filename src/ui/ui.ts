@@ -32,7 +32,7 @@ const RIGHT = ['ArrowRight', 'KeyD'];
 const OK = ['Enter', 'NumpadEnter', 'Space'];
 const BACK = ['Escape', 'Backspace'];
 /** screens that have their own way back (or none): no corner back button */
-const NO_CORNER_BACK = new Set(['main', 'pause', 'onlinePause', 'post', 'trophy']);
+const NO_CORNER_BACK = new Set(['main', 'pause', 'onlinePause', 'post', 'trophy', 'touchLayout']);
 
 export type UiSound = 'move' | 'select' | 'back';
 
@@ -122,6 +122,8 @@ export class UI {
     s.items[this.index]?.el.classList.remove('sel');
     this.index = i;
     s.items[i].el.classList.add('sel');
+    // keyboard: keep the selected row visible in scrolling panels
+    if (sound) s.items[i].el.scrollIntoView?.({ block: 'nearest' });
     if (sound) this.onSound('move');
   }
 

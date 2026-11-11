@@ -8,6 +8,7 @@ import { setLang, t, tr, onLangChange } from '../i18n/i18n';
 import { KeyboardController, menuKeys, type Controller } from '../input/controls';
 import { Keyboard } from '../input/keyboard';
 import { MultiController, TouchControls } from '../input/touch';
+import { touchLayoutScreen } from '../ui/touchLayoutUi';
 import { OnlineSession } from '../net/online';
 import { Renderer } from '../render/renderer';
 import { heroSelect } from '../ui/heroSelect';
@@ -149,7 +150,7 @@ export class Game implements AppActions {
     }
     this.match = m;
     const demo = setup.mode === 'demo';
-    this.renderer.fx.attach(m, !demo);
+    this.renderer.fx.attach(m, !demo && this.settings.cinematic);
     // the menu background match is silent: only the light menu music plays
     if (demo) this.gameAudio.detach();
     else this.gameAudio.attach(m);
@@ -200,7 +201,7 @@ export class Game implements AppActions {
   beginOnlineMatch(m: Match): void {
     this.setup = { mode: 'online', chars: m.config.chars, difficulty: 'medium', humanScheme: 'wasd', duration: m.config.duration };
     this.match = m;
-    this.renderer.fx.attach(m, true);
+    this.renderer.fx.attach(m, this.settings.cinematic);
     this.gameAudio.attach(m);
     this.tracker = null;
     this.recorder.clear();
@@ -237,6 +238,9 @@ export class Game implements AppActions {
     this.kb.setGameKeys([...Object.values(c.p1).flat(), ...Object.values(c.p2).flat()]);
     this.audio.setVolumes(this.settings.sfxVolume, this.settings.musicVolume);
     this.renderer.showFps = this.settings.showFps;
+    this.renderer.fx.shakeOn = this.settings.shake;
+    this.renderer.setMaxDpr(this.settings.quality === 'high' ? 2 : this.settings.quality === 'normal' ? 1.5 : 1);
+    this.touch.applySettings(this.settings);
     if (this.match && this.setup.mode !== 'demo' && this.setup.mode !== 'online') {
       this.match.powerups.enabled = this.settings.powerups;
       if (!this.settings.powerups) this.match.powerups.endAll(this.match);
@@ -262,6 +266,21 @@ export class Game implements AppActions {
 
   showPause(): void {
     this.ui.show(pauseScreen(this));
+  }
+
+  /** Layout editor for the on-screen buttons (from the settings). */
+  editTouchLayout(back: () => void): void {
+    this.ui.show(
+      touchLayoutScreen({
+        settings: this.settings,
+        touch: this.touch,
+        save: () => {
+          this.saveSettings();
+          this.onSettingsChanged();
+        },
+        back,
+      }),
+    );
   }
 
   showSettings(back: () => void): void {
@@ -464,7 +483,7 @@ export class Game implements AppActions {
       }
       if (net) net.frameAfter(now);
       this.renderer.update(dtReal);
-      this.audio.setCrowd(demo ? 0 : this.renderer.stadium.excitement);
+      this.audio.setCrowd(demo ? 0 : this.renderer.stadium.excitement * this.settings.crowdVolume);
       if (!this.replay && !net) this.checkMatchOver();
     }
     // on-screen buttons only while a match against the computer is being played
