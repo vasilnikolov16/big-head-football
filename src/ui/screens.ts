@@ -2,7 +2,18 @@ import type { Difficulty } from '../ai/aiController';
 import type { Settings } from '../core/storage';
 import type { Match } from '../game/match';
 import { drawBall } from '../render/ballDraw';
-import { button, h, keycap, optionRow, type NavItem, type Screen } from './ui';
+import {
+  ACTION_LABELS,
+  ACTIONS,
+  cloneBinding,
+  DEFAULT_P1,
+  DEFAULT_P2,
+  keyLabel,
+  RESERVED_KEYS,
+  type Action,
+  type Binding,
+} from '../input/controls';
+import { button, h, keycap, optionRow, sliderRow, type NavItem, type Screen, type UI } from './ui';
 
 export type MatchMode = 'cpu' | 'pvp' | 'demo';
 
@@ -14,11 +25,15 @@ export interface AppActions {
   showCpuSetup(): void;
   showHowTo(back: () => void): void;
   showSettings(back: () => void): void;
+  showControls(back: () => void): void;
+  onSettingsChanged(): void;
+  readonly ui: UI;
   showHeroSelect(mode: 'cpu' | 'pvp'): void;
   startPvp(): void;
   rematch(): void;
   changeHeroes(): void;
   resume(): void;
+  showPause(): void;
   restart(): void;
   quitToMenu(): void;
 }
@@ -92,10 +107,10 @@ export function cpuSetup(app: AppActions): Screen {
     },
   );
   const ctrl = optionRow<'wasd' | 'arrows'>(
-    'Управление',
+    'Твоите контроли',
     [
-      { value: 'wasd', label: 'WASD' },
-      { value: 'arrows', label: 'Стрелки' },
+      { value: 'wasd', label: 'Играч 1' },
+      { value: 'arrows', label: 'Играч 2' },
     ],
     () => s.humanScheme,
     (v) => {
@@ -138,11 +153,21 @@ function durationRow(app: AppActions): NavItem {
 
 // ------------------------------------------------------------------ how to play
 
-function controlsCard(title: string, color: string, keys: Array<[HTMLElement[], string]>): HTMLElement {
+function bindingCaps(codes: string[]): HTMLElement[] {
+  return codes.slice(0, 2).map((c) => keycap(keyLabel(c), keyLabel(c).length > 2));
+}
+
+function controlsCard(title: string, color: string, b: Binding): HTMLElement {
   const card = h('div', 'ctrl-card');
   card.style.setProperty('--team', color);
   card.append(h('h3', '', title));
-  for (const [caps, label] of keys) {
+  const rows: Array<[HTMLElement[], string]> = [
+    [[...bindingCaps(b.left).slice(0, 1), ...bindingCaps(b.right).slice(0, 1)], 'движение'],
+    [bindingCaps(b.jump), 'скок (задръж = по-високо)'],
+    [bindingCaps(b.kick), 'ритник'],
+    [bindingCaps(b.super), 'супер удар'],
+  ];
+  for (const [caps, label] of rows) {
     const row = h('div', 'ctrl-row');
     const kk = h('div', 'ctrl-keys');
     caps.forEach((c) => kk.append(c));
@@ -152,30 +177,20 @@ function controlsCard(title: string, color: string, keys: Array<[HTMLElement[], 
   return card;
 }
 
-export function howToPlay(back: () => void): Screen {
+export function howToPlay(app: AppActions, back: () => void): Screen {
   const { root, body } = panel('Как се играе', 'wide');
   const cards = h('div', 'ctrl-cards');
   cards.append(
-    controlsCard('Играч 1 · ляв', '#ff4d4d', [
-      [[keycap('A'), keycap('D')], 'движение'],
-      [[keycap('W')], 'скок (задръж = по-високо)'],
-      [[keycap('S')], 'ритник'],
-      [[keycap('L Shift', true)], 'супер удар'],
-    ]),
-    controlsCard('Играч 2 · десен', '#2f8cff', [
-      [[keycap('←'), keycap('→')], 'движение'],
-      [[keycap('↑')], 'скок (задръж = по-високо)'],
-      [[keycap('↓')], 'ритник'],
-      [[keycap('R Shift', true), keycap('Enter', true)], 'супер удар'],
-    ]),
+    controlsCard('Играч 1 · ляв', '#ff4d4d', app.settings.controls.p1),
+    controlsCard('Играч 2 · десен', '#2f8cff', app.settings.controls.p2),
   );
   const tips = h('ul', 'tips');
   for (const t of [
     'Ритникът е най-силен, ако го натиснеш малко преди топката да стигне до крака. Късният ритник праща топката високо.',
-    'Ударът с глава отскача по-живо, особено ако скочиш срещу топката.',
-    'Голът се брои, когато цялата топка мине линията под гредата.',
+    'Докосвай топката, за да пълниш лентата. Пълна лента → супер бутона → следващото докосване изстрелва супер удара.',
+    'Удряй бонусите с топката (или ги докосни), за да ги вземеш.',
     'При равенство след края на времето — златен гол: следващият печели.',
-    'Esc или P — пауза. Срещу компютъра можеш да играеш с WASD или стрелките.',
+    'Esc или P — пауза. Клавишите се сменят от Настройки → Управление.',
   ])
     tips.append(h('li', '', t));
   const ok = button('Разбрах!', back, 'btn btn-go btn-small');
@@ -183,23 +198,158 @@ export function howToPlay(back: () => void): Screen {
   return { id: 'howto', root, items: [ok], back };
 }
 
+// ------------------------------------------------------------------ key bindings
+
+export function controlsScreen(app: AppActions, back: () => void): Screen {
+  const { root, body } = panel('Управление', 'wide controls');
+  const c = app.settings.controls;
+  const players: Array<['p1' | 'p2', string, string]> = [
+    ['p1', 'Играч 1 · ляв', '#ff4d4d'],
+    ['p2', 'Играч 2 · десен', '#2f8cff'],
+  ];
+  let capturing: { pl: 'p1' | 'p2'; action: Action } | null = null;
+  const msg = h('p', 'desc bind-msg', 'Избери действие, натисни Enter (или кликни), после натисни новия клавиш.');
+  const rowEls: Array<{ pl: 'p1' | 'p2'; action: Action; keys: HTMLElement; el: HTMLElement }> = [];
+  const items: NavItem[] = [];
+
+  const cols = h('div', 'ctrl-cards');
+  for (const [pl, title, color] of players) {
+    const card = h('div', 'ctrl-card');
+    card.style.setProperty('--team', color);
+    card.append(h('h3', '', title));
+    for (const action of ACTIONS) {
+      const el = h('div', 'bind-row');
+      const keys = h('div', 'bind-keys');
+      el.append(h('span', 'bind-label', ACTION_LABELS[action]), keys);
+      card.append(el);
+      rowEls.push({ pl, action, keys, el });
+      items.push({
+        el,
+        activate: () => {
+          refresh();
+          capturing = { pl, action };
+          el.classList.add('capturing');
+          keys.innerHTML = '';
+          keys.append(h('span', 'press', 'Натисни клавиш…'));
+          msg.textContent = 'Натисни новия клавиш (Esc — отказ).';
+        },
+      });
+    }
+    cols.append(card);
+  }
+
+  function refresh(): void {
+    for (const r of rowEls) {
+      r.keys.innerHTML = '';
+      c[r.pl][r.action].forEach((k, i) => {
+        if (i > 0) r.keys.append(h('span', 'or', 'или'));
+        r.keys.append(keycap(keyLabel(k), keyLabel(k).length > 2));
+      });
+      r.el.classList.remove('capturing');
+    }
+  }
+
+  const bind = (pl: 'p1' | 'p2', action: Action, code: string): void => {
+    const old = c[pl][action][0];
+    let swapped = '';
+    for (const other of ['p1', 'p2'] as const) {
+      for (const a of ACTIONS) {
+        if (other === pl && a === action) continue;
+        const list = c[other][a];
+        const i = list.indexOf(code);
+        if (i < 0) continue;
+        list.splice(i, 1);
+        if (list.length === 0) list.push(old); // swap the two keys
+        swapped = `${keyLabel(code)} беше „${ACTION_LABELS[a]}“ на ${other === 'p1' ? 'Играч 1' : 'Играч 2'} — сега там е ${keyLabel(c[other][a][0])}.`;
+      }
+    }
+    c[pl][action].splice(0, c[pl][action].length, code);
+    app.saveSettings();
+    app.onSettingsChanged();
+    msg.textContent = swapped || `Готово: ${ACTION_LABELS[action]} = ${keyLabel(code)}`;
+  };
+
+  const reset = button(
+    'По подразбиране',
+    () => {
+      const d1 = cloneBinding(DEFAULT_P1);
+      const d2 = cloneBinding(DEFAULT_P2);
+      for (const a of ACTIONS) {
+        c.p1[a].splice(0, c.p1[a].length, ...d1[a]);
+        c.p2[a].splice(0, c.p2[a].length, ...d2[a]);
+      }
+      app.saveSettings();
+      app.onSettingsChanged();
+      msg.textContent = 'Върнато е стандартното управление.';
+      refresh();
+    },
+    'btn btn-alt btn-small',
+  );
+  const done = button('Готово', back, 'btn btn-go btn-small');
+  items.push(reset, done);
+  body.append(cols, msg, h('div', 'row-buttons', undefined, [reset.el, done.el]));
+  refresh();
+
+  const onKey = (code: string): boolean => {
+    if (capturing) {
+      const cap = capturing;
+      capturing = null;
+      if (code === 'Escape') msg.textContent = 'Отказано.';
+      else if (RESERVED_KEYS.has(code)) msg.textContent = `${keyLabel(code)} е запазен (пауза/меню) — избери друг клавиш.`;
+      else bind(cap.pl, cap.action, code);
+      refresh();
+      return true;
+    }
+    // ←/→ jumps between the two players' columns
+    const i = app.ui.selectedIndex;
+    const n = ACTIONS.length;
+    if ((code === 'ArrowLeft' || code === 'ArrowRight' || code === 'KeyA' || code === 'KeyD') && i < n * 2) {
+      app.ui.select(i < n ? i + n : i - n);
+      return true;
+    }
+    return false;
+  };
+  return { id: 'controls', root, items, back, onKey };
+}
+
 // ------------------------------------------------------------------ settings
 
 export function settingsScreen(app: AppActions, back: () => void): Screen {
   const { root, body } = panel('Настройки');
+  const s = app.settings;
+  const changed = (): void => {
+    app.saveSettings();
+    app.onSettingsChanged();
+  };
+  const sfx = sliderRow('Звукови ефекти', () => s.sfxVolume, (v) => {
+    s.sfxVolume = v;
+    changed();
+  });
+  const music = sliderRow('Музика', () => s.musicVolume, (v) => {
+    s.musicVolume = v;
+    changed();
+  });
+  const onOff = [
+    { value: true, label: 'Вкл.' },
+    { value: false, label: 'Изкл.' },
+  ];
+  const bonuses = optionRow('Бонуси на терена', onOff, () => s.powerups, (v) => {
+    s.powerups = v;
+    changed();
+  });
+  const replays = optionRow('Повторение на гола', onOff, () => s.replays, (v) => {
+    s.replays = v;
+    changed();
+  });
   const dur = durationRow(app);
-  const diff = optionRow(
-    'Трудност (комп.)',
-    DIFFICULTIES,
-    () => app.settings.difficulty,
-    (v) => {
-      app.settings.difficulty = v;
-      app.saveSettings();
-    },
-  );
+  const diff = optionRow('Трудност (комп.)', DIFFICULTIES, () => s.difficulty, (v) => {
+    s.difficulty = v;
+    changed();
+  });
+  const keys = button('Управление (клавиши) ▸', () => app.showControls(() => app.showSettings(back)), 'btn btn-alt btn-small');
   const ok = button('Готово', back, 'btn btn-go btn-small');
-  body.append(dur.el, diff.el, h('p', 'desc', 'Звук, музика и бонуси идват в следващите етапи.'), h('div', 'row-buttons', undefined, [ok.el]));
-  return { id: 'settings', root, items: [dur, diff, ok], back };
+  body.append(sfx.el, music.el, bonuses.el, replays.el, dur.el, diff.el, h('div', 'row-buttons', undefined, [keys.el, ok.el]));
+  return { id: 'settings', root, items: [sfx, music, bonuses, replays, dur, diff, keys, ok], back };
 }
 
 // ------------------------------------------------------------------ pause
@@ -209,7 +359,7 @@ export function pauseScreen(app: AppActions): Screen {
   const items = [
     button('Продължи', () => app.resume(), 'btn btn-go'),
     button('Започни отначало', () => app.restart()),
-    button('Как се играе', () => app.showHowTo(() => app.resume()), 'btn btn-alt'),
+    button('Как се играе', () => app.showHowTo(() => app.showPause()), 'btn btn-alt'),
     button('Към менюто', () => app.quitToMenu(), 'btn btn-alt'),
   ];
   const list = h('div', 'menu-list compact');

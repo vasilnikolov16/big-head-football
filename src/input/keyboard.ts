@@ -43,6 +43,8 @@ export class Keyboard {
   private presses = new Map<string, number>();
   private seq = 0;
   private listeners: Array<(code: string) => void> = [];
+  /** keys bound to gameplay: the browser must not scroll/act on them */
+  private gameKeys = new Set<string>();
 
   constructor(target: Window = window) {
     target.addEventListener('keydown', this.onDown, { passive: false });
@@ -55,7 +57,7 @@ export class Keyboard {
 
   private onDown = (e: KeyboardEvent): void => {
     const code = codeOf(e);
-    if (BLOCKED.has(code)) e.preventDefault();
+    if (BLOCKED.has(code) || this.gameKeys.has(code)) e.preventDefault();
     if (e.repeat) return;
     if (!this.down.has(code)) this.down.set(code, ++this.seq);
     this.presses.set(code, performance.now());
@@ -64,9 +66,13 @@ export class Keyboard {
 
   private onUp = (e: KeyboardEvent): void => {
     const code = codeOf(e);
-    if (BLOCKED.has(code)) e.preventDefault();
+    if (BLOCKED.has(code) || this.gameKeys.has(code)) e.preventDefault();
     this.down.delete(code);
   };
+
+  setGameKeys(codes: string[]): void {
+    this.gameKeys = new Set(codes);
+  }
 
   reset = (): void => {
     this.down.clear();

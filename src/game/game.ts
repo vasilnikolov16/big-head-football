@@ -1,10 +1,11 @@
 import { AIController, type Difficulty } from '../ai/aiController';
 import { DT } from '../core/constants';
 import { loadSettings, saveSettings, type Settings } from '../core/storage';
-import { KeyboardController, SCHEME_ARROWS, SCHEME_WASD } from '../input/controls';
+import { KeyboardController, menuKeys } from '../input/controls';
 import { Keyboard } from '../input/keyboard';
 import { Renderer } from '../render/renderer';
 import {
+  controlsScreen,
   cpuSetup,
   howToPlay,
   mainMenu,
@@ -53,6 +54,7 @@ export class Game implements AppActions {
     this.renderer = new Renderer(canvas, uiHost);
     this.ui = new UI(uiHost);
     this.kb.onPress((code) => this.onKey(code));
+    this.onSettingsChanged();
     this.startDemo();
     this.showMain();
   }
@@ -64,14 +66,15 @@ export class Game implements AppActions {
     const names: [string, string] = [setup.chars[0].name, setup.chars[1].name];
     let tags: [string, string];
     if (setup.mode === 'cpu') tags = ['ТИ', DIFF_LABEL[setup.difficulty]];
-    else if (setup.mode === 'pvp') tags = ['P1 · WASD', 'P2 · СТРЕЛКИ'];
+    else if (setup.mode === 'pvp') tags = ['P1', 'P2'];
     else tags = ['CPU', 'CPU'];
     const m = new Match({ chars: setup.chars, names, tags, duration: setup.duration });
     if (setup.mode === 'pvp') {
-      m.controllers[0] = new KeyboardController(this.kb, SCHEME_WASD);
-      m.controllers[1] = new KeyboardController(this.kb, SCHEME_ARROWS);
+      m.controllers[0] = new KeyboardController(this.kb, this.settings.controls.p1);
+      m.controllers[1] = new KeyboardController(this.kb, this.settings.controls.p2);
     } else if (setup.mode === 'cpu') {
-      m.controllers[0] = new KeyboardController(this.kb, setup.humanScheme === 'wasd' ? SCHEME_WASD : SCHEME_ARROWS);
+      const c = this.settings.controls;
+      m.controllers[0] = new KeyboardController(this.kb, setup.humanScheme === 'wasd' ? c.p1 : c.p2);
       m.controllers[1] = new AIController(m, 1, setup.difficulty);
     } else {
       m.controllers[0] = new AIController(m, 0, Math.random() < 0.5 ? 'medium' : 'hard');
@@ -114,7 +117,21 @@ export class Game implements AppActions {
   }
 
   showHowTo(back: () => void): void {
-    this.ui.show(howToPlay(back));
+    this.ui.show(howToPlay(this, back));
+  }
+
+  showControls(back: () => void): void {
+    this.ui.show(controlsScreen(this, back));
+  }
+
+  showPause(): void {
+    this.ui.show(pauseScreen(this));
+  }
+
+  /** Settings that need to be pushed to running systems (audio, input). */
+  onSettingsChanged(): void {
+    const c = this.settings.controls;
+    this.kb.setGameKeys([...Object.values(c.p1).flat(), ...Object.values(c.p2).flat()]);
   }
 
   showSettings(back: () => void): void {
@@ -129,6 +146,11 @@ export class Game implements AppActions {
         initial: mode === 'cpu' ? [hs.p1, hs.cpu] : [hs.p1, hs.p2],
         isLocked: () => false, // unlocking arrives with the tournament (stage 5)
         rightLabel: DIFF_LABEL[this.settings.difficulty],
+        keys: [
+          menuKeys(this.settings.controls.p1, 'Space', 'KeyQ'),
+          menuKeys(this.settings.controls.p2, 'Enter', 'Backspace'),
+        ],
+        sound: (snd) => this.ui.onSound(snd),
         onBack: () => (mode === 'cpu' ? this.showCpuSetup() : this.showMain()),
         onDone: (a, b) => {
           hs.p1 = a.id;

@@ -1,8 +1,9 @@
 import { CHARACTERS, type CharacterDef } from '../game/characters';
 import { Player } from '../game/player';
 import { SUPER_INFO } from '../game/supers';
+import { keyLabel, type MenuKeys } from '../input/controls';
 import { drawHead, drawPlayer } from '../render/playerDraw';
-import { h, type Screen } from './ui';
+import { h, type Screen, type UiSound } from './ui';
 
 export interface HeroSelectOptions {
   mode: 'cpu' | 'pvp';
@@ -11,6 +12,9 @@ export interface HeroSelectOptions {
   isLocked: (c: CharacterDef) => boolean;
   /** e.g. "CPU · трудно" */
   rightLabel: string;
+  /** menu keys of player 1 and player 2 (derived from their bindings) */
+  keys: [MenuKeys, MenuKeys];
+  sound: (s: UiSound) => void;
   onDone: (left: CharacterDef, right: CharacterDef) => void;
   onBack: () => void;
 }
@@ -23,25 +27,14 @@ const STAT_LABELS: Array<[keyof CharacterDef['stats'], string]> = [
   ['head', 'Глава'],
 ];
 
-// keys for the two cursors
-const P1_MOVE: Record<string, [number, number]> = { KeyA: [-1, 0], KeyD: [1, 0], KeyW: [0, -1], KeyS: [0, 1] };
-const P2_MOVE: Record<string, [number, number]> = {
-  ArrowLeft: [-1, 0],
-  ArrowRight: [1, 0],
-  ArrowUp: [0, -1],
-  ArrowDown: [0, 1],
-};
-const P1_OK = ['Space', 'ShiftLeft', 'KeyF'];
-const P2_OK = ['Enter', 'NumpadEnter', 'ShiftRight'];
-
-function makeCanvas(w: number, h: number, cls: string): HTMLCanvasElement {
+function makeCanvas(w: number, hgt: number, cls: string): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.className = cls;
   const dpr = Math.min(2, window.devicePixelRatio || 1) * 1.5;
   c.width = Math.round(w * dpr);
-  c.height = Math.round(h * dpr);
+  c.height = Math.round(hgt * dpr);
   c.style.width = `${w}px`;
-  c.style.height = `${h}px`;
+  c.style.height = `${hgt}px`;
   return c;
 }
 
@@ -49,23 +42,35 @@ interface Side {
   root: HTMLElement;
   canvas: HTMLCanvasElement;
   name: HTMLElement;
-  tag: HTMLElement;
   tagline: HTMLElement;
   stats: HTMLElement[];
   superName: HTMLElement;
   superDesc: HTMLElement;
+  readyBtn: HTMLButtonElement;
   player: Player;
   heroId: string;
 }
 
+const keysText = (k: MenuKeys): string => {
+  const mv = [k.left[0], k.right[0], k.up[0], k.down[0]].map(keyLabel).join(' ');
+  return `${mv} избор · ${keyLabel(k.ok[0])} готов`;
+};
+
+/**
+ * Hero select. Everybody browses freely (the big preview follows the cursor),
+ * locks in with "Готов", and the match starts only with the START button once
+ * both sides are ready.
+ */
 export function heroSelect(o: HeroSelectOptions): Screen {
   const chars = CHARACTERS;
   const idx = (id: string): number => Math.max(0, chars.findIndex((c) => c.id === id));
   const cursor: [number, number] = [idx(o.initial[0]), idx(o.initial[1])];
   if (cursor[0] === cursor[1]) cursor[1] = (cursor[0] + 1) % chars.length;
   const ready: [boolean, boolean] = [false, false];
-  let step = 0; // cpu mode: 0 = pick hero, 1 = pick opponent
+  let step = 0; // cpu mode: 0 = pick your hero, 1 = pick the opponent
   let launching = false;
+  const cpu = o.mode === 'cpu';
+  const allReady = (): boolean => ready[0] && ready[1];
 
   const root = h('div', `scr scr-select mode-${o.mode}`);
   const title = h('h2', 'sel-title', 'Избери герой');
@@ -77,10 +82,10 @@ export function heroSelect(o: HeroSelectOptions): Screen {
   // ---------------------------------------------------------------- side panels
   const makeSide = (i: 0 | 1): Side => {
     const el = h('div', `sel-side s${i}`);
-    const badge = h('div', 'sel-badge', i === 0 ? (o.mode === 'cpu' ? 'ТИ' : 'P1') : o.mode === 'cpu' ? 'CPU' : 'P2');
-    const canvas = makeCanvas(250, 230, 'sel-preview');
+    const badge = h('div', 'sel-badge', i === 0 ? (cpu ? 'ТИ' : 'P1') : cpu ? 'CPU' : 'P2');
+    const canvas = makeCanvas(250, 220, 'sel-preview');
     const name = h('div', 'sel-name');
-    const tag = h('div', 'sel-ready', 'ГОТОВ!');
+    const stamp = h('div', 'sel-ready', 'ГОТОВ!');
     const tagline = h('div', 'sel-tagline');
     const statsBox = h('div', 'sel-stats');
     const stats: HTMLElement[] = [];
@@ -96,14 +101,18 @@ export function heroSelect(o: HeroSelectOptions): Screen {
     const superName = h('div', 'super-name');
     const superDesc = h('div', 'super-desc');
     sup.append(h('div', 'super-label', 'СУПЕР УДАР'), superName, superDesc);
-    el.append(badge, canvas, tag, name, tagline, statsBox, sup);
+    const readyBtn = h('button', 'btn btn-small sel-ready-btn');
+    readyBtn.type = 'button';
+    readyBtn.addEventListener('click', () => onReadyClick(i));
+    el.append(badge, canvas, stamp, name, tagline, statsBox, sup, readyBtn);
     const player = new Player(i, chars[cursor[i]]);
     player.placeAt(0, 0);
-    return { root: el, canvas, name, tag, tagline, stats, superName, superDesc, player, heroId: '' };
+    return { root: el, canvas, name, tagline, stats, superName, superDesc, readyBtn, player, heroId: '' };
   };
   const sides: [Side, Side] = [makeSide(0), makeSide(1)];
 
-  // ---------------------------------------------------------------- grid
+  // ---------------------------------------------------------------- grid + start
+  const center = h('div', 'sel-center');
   const grid = h('div', 'sel-grid');
   const cards = chars.map((c, i) => {
     const card = h('div', 'hero-card');
@@ -113,15 +122,19 @@ export function heroSelect(o: HeroSelectOptions): Screen {
       card.classList.add('locked');
       card.append(h('div', 'lock', '🔒'));
     }
-    card.append(h('div', 'cur-badge b1', o.mode === 'cpu' ? 'ТИ' : 'P1'), h('div', 'cur-badge b2', o.mode === 'cpu' ? 'CPU' : 'P2'));
+    card.append(h('div', 'cur-badge b1', cpu ? 'ТИ' : 'P1'), h('div', 'cur-badge b2', cpu ? 'CPU' : 'P2'));
     card.addEventListener('click', () => onCardClick(i));
     grid.append(card);
     const portrait = new Player(0, c);
     portrait.placeAt(0, 0);
     return { card, cv, portrait };
   });
+  const startBtn = h('button', 'btn btn-go sel-start');
+  startBtn.type = 'button';
+  startBtn.addEventListener('click', () => start());
+  center.append(grid, startBtn);
 
-  layout.append(sides[0].root, grid, sides[1].root);
+  layout.append(sides[0].root, center, sides[1].root);
   const vs = h('div', 'vs-splash');
   root.append(vs);
   const hints = h('div', 'hints');
@@ -129,23 +142,32 @@ export function heroSelect(o: HeroSelectOptions): Screen {
 
   // ---------------------------------------------------------------- state -> DOM
   const refresh = (): void => {
-    const cpu = o.mode === 'cpu';
     if (cpu) {
-      title.textContent = step === 0 ? 'Избери герой' : 'Избери противник';
-      subtitle.textContent = step === 0 ? 'С кого ще играеш?' : `Срещу кого? (${o.rightLabel})`;
-      hints.textContent =
-        step === 0
-          ? '← → ↑ ↓ избор   ·   Enter потвърди   ·   Esc назад'
-          : '← → ↑ ↓ избор   ·   Enter потвърди   ·   R случаен   ·   Esc назад';
+      title.textContent = allReady() ? 'Всичко е готово!' : step === 0 ? 'Избери герой' : 'Избери противник';
+      subtitle.textContent = allReady()
+        ? 'Натисни СТАРТ'
+        : step === 0
+          ? 'Разгледай героите и избери с кого ще играеш'
+          : `Срещу кого ще играеш? (${o.rightLabel})`;
+      hints.textContent = allReady()
+        ? 'Enter — старт   ·   Esc — промени'
+        : step === 0
+          ? '← → ↑ ↓ разглеждане   ·   Enter готов   ·   Esc назад'
+          : '← → ↑ ↓ разглеждане   ·   Enter готов   ·   R случаен   ·   Esc назад';
     } else {
-      title.textContent = 'Изберете герои';
-      subtitle.textContent = 'И двамата избирате едновременно';
-      hints.textContent = 'P1: WASD + Space   ·   P2: стрелки + Enter   ·   Esc назад';
+      title.textContent = allReady() ? 'Всичко е готово!' : 'Изберете герои';
+      subtitle.textContent = allReady() ? 'Натиснете СТАРТ' : 'Разгледайте героите — всеки избира сам';
+      hints.textContent = allReady()
+        ? `${keyLabel(o.keys[0].ok[0])} или ${keyLabel(o.keys[1].ok[0])} — старт   ·   Esc — промени`
+        : `P1: ${keysText(o.keys[0])}   ·   P2: ${keysText(o.keys[1])}   ·   Esc назад`;
     }
+    startBtn.textContent = allReady() ? 'СТАРТ ▸' : cpu ? 'Избери двамата' : 'Чакаме двамата играчи…';
+    startBtn.classList.toggle('disabled', !allReady());
+    startBtn.classList.toggle('sel', allReady());
+
     cards.forEach(({ card }, i) => {
-      const show1 = true;
       const show2 = !cpu || step === 1 || ready[1];
-      card.classList.toggle('c1', show1 && cursor[0] === i);
+      card.classList.toggle('c1', cursor[0] === i);
       card.classList.toggle('c2', show2 && cursor[1] === i);
       card.classList.toggle('r1', ready[0] && cursor[0] === i);
       card.classList.toggle('r2', ready[1] && cursor[1] === i);
@@ -153,9 +175,11 @@ export function heroSelect(o: HeroSelectOptions): Screen {
     for (const i of [0, 1] as const) {
       const s = sides[i];
       const c = chars[cursor[i]];
-      const hiddenRight = cpu && i === 1 && step === 0 && !ready[1];
+      const hiddenRight = cpu && i === 1 && step === 0;
       s.root.classList.toggle('waiting', hiddenRight);
       s.root.classList.toggle('ready', ready[i]);
+      const active = !cpu || (i === 0 ? step === 0 : step === 1);
+      s.root.classList.toggle('active', active && !ready[i]);
       if (s.heroId !== c.id) {
         s.heroId = c.id;
         s.player = new Player(i, c);
@@ -175,6 +199,10 @@ export function heroSelect(o: HeroSelectOptions): Screen {
       s.superName.style.color = sup.color;
       s.superDesc.textContent = hiddenRight ? '' : sup.desc;
       s.root.style.setProperty('--hero', c.look.shirt === '#ffffff' ? '#e63946' : c.look.shirt);
+      s.readyBtn.textContent = ready[i] ? 'Промени' : 'Готов ✓';
+      s.readyBtn.classList.toggle('btn-alt', ready[i]);
+      s.readyBtn.classList.toggle('btn-go', !ready[i]);
+      s.readyBtn.style.visibility = hiddenRight ? 'hidden' : 'visible';
     }
   };
 
@@ -189,29 +217,45 @@ export function heroSelect(o: HeroSelectOptions): Screen {
     const c = chars[cursor[i]];
     if (o.isLocked(c)) return false;
     const other = (1 - i) as 0 | 1;
-    if ((ready[other] || (o.mode === 'cpu' && i === 1)) && cursor[other] === cursor[i]) return false;
-    return true;
+    return !(ready[other] && cursor[other] === cursor[i]);
   };
 
-  const confirm = (i: 0 | 1): void => {
-    if (launching) return;
-    if (ready[i]) {
-      if (o.mode === 'pvp') ready[i] = false; // toggle off
-      refresh();
-      return;
-    }
+  const setReady = (i: 0 | 1): void => {
     if (!canPick(i)) {
       shake(i);
+      o.sound('back');
       return;
     }
     ready[i] = true;
+    o.sound('select');
     sides[i].player.setExpression('happy', 1.2);
-    if (o.mode === 'cpu' && i === 0) {
+    if (cpu && i === 0) {
       step = 1;
       if (cursor[1] === cursor[0]) cursor[1] = (cursor[0] + 1) % chars.length;
     }
     refresh();
-    if (ready[0] && ready[1]) launch();
+  };
+
+  const unready = (i: 0 | 1): void => {
+    if (!ready[i]) return;
+    ready[i] = false;
+    if (cpu && i === 0) {
+      ready[1] = false;
+      step = 0;
+    }
+    o.sound('back');
+    refresh();
+  };
+
+  /** the player presses their "OK" key */
+  const confirm = (i: 0 | 1): void => {
+    if (launching) return;
+    if (allReady()) {
+      start();
+      return;
+    }
+    if (ready[i]) unready(i);
+    else setReady(i);
   };
 
   const move = (i: 0 | 1, dx: number, dy: number): void => {
@@ -220,67 +264,103 @@ export function heroSelect(o: HeroSelectOptions): Screen {
     if (dx) c = (c + dx + chars.length) % chars.length;
     if (dy) c = (c + dy * COLS + chars.length) % chars.length;
     cursor[i] = c;
+    o.sound('move');
     refresh();
   };
 
-  const randomOpponent = (): void => {
-    const pool = chars.map((_, i) => i).filter((i) => i !== cursor[0] && !o.isLocked(chars[i]));
-    cursor[1] = pool[Math.floor(Math.random() * pool.length)];
-    refresh();
-    confirm(1);
-  };
-
-  const launch = (): void => {
+  const start = (): void => {
+    if (!allReady() || launching) return;
     launching = true;
+    o.sound('select');
     vs.innerHTML = '';
-    vs.append(
-      h('div', 'vs-name l', chars[cursor[0]].name),
-      h('div', 'vs-text', 'VS'),
-      h('div', 'vs-name r', chars[cursor[1]].name),
-    );
+    vs.append(h('div', 'vs-name l', chars[cursor[0]].name), h('div', 'vs-text', 'VS'), h('div', 'vs-name r', chars[cursor[1]].name));
     vs.classList.add('show');
     window.setTimeout(() => o.onDone(chars[cursor[0]], chars[cursor[1]]), 1100);
   };
 
+  function onReadyClick(i: 0 | 1): void {
+    if (launching) return;
+    if (ready[i]) unready(i);
+    else if (!cpu || (i === 0 ? step === 0 : step === 1)) setReady(i);
+  }
+
+  /** Mouse: first click browses, clicking the selected card again locks it in. */
   function onCardClick(i: number): void {
     if (launching) return;
-    if (o.mode === 'cpu') {
-      const who = step === 0 ? 0 : 1;
-      cursor[who] = i;
-      refresh();
-      confirm(who);
+    let who: 0 | 1;
+    if (cpu) {
+      if (allReady()) return;
+      who = step === 0 ? 0 : 1;
     } else {
-      if (ready[0] && ready[1]) return;
-      const who: 0 | 1 = !ready[0] ? 0 : 1;
+      if (allReady()) return;
+      who = !ready[0] ? 0 : 1;
+    }
+    if (cursor[who] === i) setReady(who);
+    else {
       cursor[who] = i;
+      o.sound('move');
       refresh();
-      confirm(who);
     }
   }
 
+  const dirOf = (k: MenuKeys, code: string): [number, number] | null => {
+    if (k.left.includes(code)) return [-1, 0];
+    if (k.right.includes(code)) return [1, 0];
+    if (k.up.includes(code)) return [0, -1];
+    if (k.down.includes(code)) return [0, 1];
+    return null;
+  };
+
   const onKey = (code: string): boolean => {
     if (launching) return true;
-    if (code === 'Escape' || code === 'Backspace') {
-      if (o.mode === 'cpu' && step === 1) {
-        step = 0;
-        ready[0] = false;
-        ready[1] = false;
+    if (code === 'Escape') {
+      if (cpu) {
+        if (ready[1]) unready(1);
+        else if (ready[0] || step === 1) unready(0);
+        else o.onBack();
+      } else if (ready[0] || ready[1]) {
+        ready[0] = ready[1] = false;
+        o.sound('back');
         refresh();
       } else o.onBack();
       return true;
     }
-    if (o.mode === 'cpu') {
+    if (cpu) {
+      // one person picks both: accept everybody's keys + the usual menu keys
       const who = step === 0 ? 0 : 1;
-      const d = P1_MOVE[code] ?? P2_MOVE[code];
-      if (d) move(who, d[0], d[1]);
-      else if (P1_OK.includes(code) || P2_OK.includes(code)) confirm(who);
-      else if (code === 'KeyR' && step === 1) randomOpponent();
+      const d = dirOf(o.keys[0], code) ?? dirOf(o.keys[1], code) ?? dirOf(FALLBACK, code);
+      if (d) {
+        if (!allReady()) move(who, d[0], d[1]);
+      } else if (['Enter', 'NumpadEnter', 'Space', ...o.keys[0].ok, ...o.keys[1].ok].includes(code)) {
+        if (allReady()) start();
+        else setReady(who);
+      } else if (code === 'KeyR' && step === 1 && !ready[1]) {
+        const pool = chars.map((_, i) => i).filter((i) => i !== cursor[0] && !o.isLocked(chars[i]));
+        cursor[1] = pool[Math.floor(Math.random() * pool.length)];
+        o.sound('move');
+        refresh();
+      } else if (code === 'Backspace') {
+        if (ready[1]) unready(1);
+        else unready(0);
+      }
       return true;
     }
-    if (P1_MOVE[code]) move(0, ...P1_MOVE[code]);
-    else if (P2_MOVE[code]) move(1, ...P2_MOVE[code]);
-    else if (P1_OK.includes(code)) confirm(0);
-    else if (P2_OK.includes(code)) confirm(1);
+    for (const i of [0, 1] as const) {
+      const k = o.keys[i];
+      const d = dirOf(k, code);
+      if (d) {
+        move(i, d[0], d[1]);
+        return true;
+      }
+      if (k.ok.includes(code)) {
+        confirm(i);
+        return true;
+      }
+      if (k.cancel.includes(code)) {
+        unready(i);
+        return true;
+      }
+    }
     return true;
   };
 
@@ -303,13 +383,12 @@ export function heroSelect(o: HeroSelectOptions): Screen {
       g.setTransform(1, 0, 0, 1, 0, 0);
       g.clearRect(0, 0, s.canvas.width, s.canvas.height);
       g.setTransform(k, 0, 0, k, 0, 0);
-      // podium
       g.fillStyle = 'rgba(0,0,0,0.35)';
       g.beginPath();
-      g.ellipse(125, 214, 70, 12, 0, 0, Math.PI * 2);
+      g.ellipse(125, 206, 70, 12, 0, 0, Math.PI * 2);
       g.fill();
-      g.translate(125, 212);
-      const scale = 1.25 * (48 / Math.max(48, p.headR));
+      g.translate(125, 204);
+      const scale = 1.2 * (48 / Math.max(48, p.headR));
       g.scale(scale, scale);
       drawPlayer(g, p, 1, t);
     }
@@ -338,3 +417,13 @@ export function heroSelect(o: HeroSelectOptions): Screen {
     dispose: () => cancelAnimationFrame(raf),
   };
 }
+
+/** Arrow keys and WASD always work for browsing in single-player selection. */
+const FALLBACK: MenuKeys = {
+  left: ['ArrowLeft', 'KeyA'],
+  right: ['ArrowRight', 'KeyD'],
+  up: ['ArrowUp', 'KeyW'],
+  down: ['ArrowDown', 'KeyS'],
+  ok: [],
+  cancel: [],
+};

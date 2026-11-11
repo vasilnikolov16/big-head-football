@@ -45,6 +45,10 @@ export class UI {
     return this.current !== null;
   }
 
+  get selectedIndex(): number {
+    return this.index;
+  }
+
   get screenId(): string | null {
     return this.current?.id ?? null;
   }
@@ -201,6 +205,38 @@ export function optionRow<T>(
   const shift = (d: number): void => {
     const i = values.findIndex((v) => v.value === get());
     set(values[(i + d + values.length) % values.length].value);
+    refresh();
+  };
+  refresh();
+  return { el, left: () => shift(-1), right: () => shift(1) };
+}
+
+/** A 0..1 value shown as 10 segments, changed with ←/→ or by clicking. */
+export function sliderRow(label: string, get: () => number, set: (v: number) => void): NavItem {
+  const el = h('div', 'opt-row');
+  el.append(h('span', 'opt-label', label));
+  const bar = h('div', 'slider');
+  const segs: HTMLElement[] = [];
+  for (let i = 0; i < 10; i++) {
+    const sgm = h('span', 'seg');
+    sgm.addEventListener('click', (e) => {
+      e.stopPropagation();
+      set((i + 1) / 10);
+      refresh();
+    });
+    bar.append(sgm);
+    segs.push(sgm);
+  }
+  const val = h('span', 'slider-val');
+  bar.append(val);
+  el.append(bar);
+  const refresh = (): void => {
+    const v = Math.round(get() * 10);
+    segs.forEach((sg, i) => sg.classList.toggle('on', i < v));
+    val.textContent = v === 0 ? 'изкл.' : `${v * 10}%`;
+  };
+  const shift = (d: number): void => {
+    set(Math.max(0, Math.min(1, Math.round(get() * 10 + d) / 10)));
     refresh();
   };
   refresh();
