@@ -7,6 +7,8 @@ import type { Player } from './player';
 const c = makeContact();
 
 const HEADER_MIN_POP = 330;
+const HEADER_FORWARD = 140;
+const HEADER_MAX = 430;
 const KICK_REACH_BONUS = 13;
 const KICK_ACTIVE_FROM = 0.18;
 const KICK_SWEET = 0.42;
@@ -73,7 +75,7 @@ export function ballVsPlayer(ball: Ball, p: Player, events: Emitter<GameEvents>)
 
   // Head: lively bounce, adds the head's own motion, nudges the ball forward.
   if (circleCircle(ball.x, ball.y, ball.r, p.headX, p.headY, p.headR, c)) {
-    const impact = resolveBallContact(ball, c, 0.58, 0.5, p.vx, p.vy);
+    const impact = resolveBallContact(ball, c, 0.5, 0.5, p.vx, p.vy);
     if (impact > 0) {
       const rel = (ball.vx - p.vx) * c.nx + (ball.vy - p.vy) * c.ny;
       if (rel < HEADER_MIN_POP) {
@@ -81,7 +83,19 @@ export function ballVsPlayer(ball: Ball, p: Player, events: Emitter<GameEvents>)
         ball.vx += c.nx * add;
         ball.vy += c.ny * add;
       }
-      if (c.ny < 0.35) ball.vx += p.facing * 120;
+      // A standing header is a soft cushion; jumping into the ball adds real power.
+      const maxOut = HEADER_MAX + Math.max(0, -p.vy) * 0.3;
+      const out = Math.hypot(ball.vx - p.vx, ball.vy - p.vy);
+      if (out > maxOut) {
+        const k = maxOut / out;
+        ball.vx = p.vx + (ball.vx - p.vx) * k;
+        ball.vy = p.vy + (ball.vy - p.vy) * k;
+      }
+      // Headers are aimed: hits on the upper half always carry the ball forward.
+      if (c.ny < 0.35) {
+        if (ball.vx * p.facing < 0) ball.vx *= 0.45;
+        ball.vx += p.facing * HEADER_FORWARD;
+      }
       registerTouch(ball, p, events);
       if (impact > 160) {
         p.stats.headers++;

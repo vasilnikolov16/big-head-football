@@ -1,8 +1,8 @@
-import { FONT_DISPLAY, FONT_TEXT, H, INK, W } from '../core/constants';
+import { FONT_DISPLAY, H, INK, W } from '../core/constants';
 import { clamp, easeOutBack, formatTime } from '../core/math';
 import type { Banner, Match } from '../game/match';
 
-function plate(ctx: CanvasRenderingContext2D, side: 0 | 1, color: string, name: string): void {
+function plate(ctx: CanvasRenderingContext2D, side: 0 | 1, color: string, name: string, tag: string): void {
   const dir = side === 0 ? -1 : 1;
   const inner = W / 2 + dir * 96;
   const outer = W / 2 + dir * 330;
@@ -32,12 +32,25 @@ function plate(ctx: CanvasRenderingContext2D, side: 0 | 1, color: string, name: 
   ctx.textBaseline = 'middle';
   ctx.textAlign = side === 0 ? 'right' : 'left';
   ctx.fillText(name.toUpperCase(), inner + dir * 26, 40);
+  if (tag) {
+    const w = ctx.measureText(name.toUpperCase()).width;
+    ctx.font = `12px ${FONT_DISPLAY}`;
+    const tw = ctx.measureText(tag).width + 12;
+    const tx = inner + dir * (36 + w) + (side === 0 ? -tw : 0);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.roundRect(tx, 31, tw, 18, 5);
+    ctx.fill();
+    ctx.fillStyle = INK;
+    ctx.textAlign = 'left';
+    ctx.fillText(tag, tx + 6, 40.5);
+  }
   ctx.restore();
 }
 
 export function drawHud(ctx: CanvasRenderingContext2D, m: Match, t: number): void {
-  plate(ctx, 0, m.players[0].char.look.shirt, m.config.names[0]);
-  plate(ctx, 1, m.players[1].char.look.shirt, m.config.names[1]);
+  plate(ctx, 0, m.players[0].char.look.shirt, m.config.names[0], m.config.tags[0]);
+  plate(ctx, 1, m.players[1].char.look.shirt, m.config.names[1], m.config.tags[1]);
 
   // score box
   ctx.save();
@@ -108,24 +121,5 @@ export function drawBanner(ctx: CanvasRenderingContext2D, b: Banner): void {
     ctx.fillStyle = '#ffffff';
     ctx.fillText(b.sub, 0, big * 0.62);
   }
-  ctx.restore();
-}
-
-export function drawCenterOverlay(ctx: CanvasRenderingContext2D, title: string, lines: string[], color = '#ffffff'): void {
-  ctx.save();
-  ctx.fillStyle = 'rgba(6,5,20,0.62)';
-  ctx.fillRect(0, 0, W, H);
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.font = `80px ${FONT_DISPLAY}`;
-  ctx.lineJoin = 'round';
-  ctx.lineWidth = 14;
-  ctx.strokeStyle = INK;
-  ctx.strokeText(title, W / 2, H * 0.36);
-  ctx.fillStyle = color;
-  ctx.fillText(title, W / 2, H * 0.36);
-  ctx.font = `26px ${FONT_TEXT}`;
-  ctx.fillStyle = '#e6e8ff';
-  lines.forEach((l, i) => ctx.fillText(l, W / 2, H * 0.36 + 80 + i * 40));
   ctx.restore();
 }

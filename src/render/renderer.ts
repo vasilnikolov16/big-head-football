@@ -4,14 +4,13 @@ import type { Match } from '../game/match';
 import { drawBall, drawBallShadow } from './ballDraw';
 import { Fx } from './fx';
 import { drawCrossbar, drawGoalBack } from './goals';
-import { drawBanner, drawCenterOverlay, drawHud } from './hud';
+import { drawBanner, drawHud } from './hud';
 import { drawPlayer, drawPlayerShadow } from './playerDraw';
 import { Stadium } from './stadium';
 
-export interface OverlayInfo {
-  title: string;
-  lines: string[];
-  color?: string;
+export interface RenderOptions {
+  /** scoreboard + banners (hidden for the menu background match) */
+  hud: boolean;
 }
 
 export class Renderer {
@@ -75,7 +74,7 @@ export class Renderer {
     return this.fps;
   }
 
-  render(m: Match, alpha: number, t: number, overlay: OverlayInfo | null): void {
+  render(m: Match, alpha: number, t: number, opts: RenderOptions): void {
     const ctx = this.ctx;
     const fx = this.fx;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -114,9 +113,10 @@ export class Renderer {
 
     // HUD does not shake
     ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0);
-    drawHud(ctx, m, t);
-    if (m.banner) drawBanner(ctx, m.banner);
-    if (overlay) drawCenterOverlay(ctx, overlay.title, overlay.lines, overlay.color);
+    if (opts.hud) {
+      drawHud(ctx, m, t);
+      if (m.banner) drawBanner(ctx, m.banner);
+    }
 
     if (this.showFps) {
       ctx.font = `14px ${FONT_TEXT}`;

@@ -13,6 +13,8 @@ export type MatchPhase = 'kickoff' | 'playing' | 'goal' | 'ended';
 export interface MatchConfig {
   chars: [CharacterDef, CharacterDef];
   names: [string, string];
+  /** short labels under the names, e.g. "P1", "CPU" */
+  tags: [string, string];
   duration: number; // seconds
 }
 
@@ -27,6 +29,7 @@ export interface Banner {
 const KICKOFF_TIME = 1.1;
 const GOAL_TIME = 2.6;
 const BALL_DROP_Y = 170;
+const KICKOFF_SHIFT = 90;
 
 export class Match {
   readonly events = new Emitter<GameEvents>();
@@ -68,13 +71,15 @@ export class Match {
     this.phaseT = 0;
     this.players[0].resetPosition(START_X[0]);
     this.players[1].resetPosition(START_X[1]);
-    this.ball.reset(W / 2, BALL_DROP_Y);
+    // After a goal the ball drops slightly towards the side that conceded (no kickoff goal loops).
+    const shift = this.lastScorer < 0 ? 0 : this.lastScorer === 0 ? KICKOFF_SHIFT : -KICKOFF_SHIFT;
+    this.ball.reset(W / 2 + shift, BALL_DROP_Y);
   }
 
   private releaseBall(): void {
     this.phase = 'playing';
     this.phaseT = 0;
-    this.ball.vx = rand(-50, 50);
+    this.ball.vx = rand(-30, 30);
     this.ball.vy = 0;
     this.events.emit('whistle', { kind: 'start' });
   }

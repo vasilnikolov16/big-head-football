@@ -1,62 +1,197 @@
+import { AIController, type Difficulty } from '../ai/aiController';
 import { DT } from '../core/constants';
-import { Keyboard } from '../input/keyboard';
+import { loadSettings, saveSettings, type Settings } from '../core/storage';
 import { KeyboardController, SCHEME_ARROWS, SCHEME_WASD } from '../input/controls';
-import { Renderer, type OverlayInfo } from '../render/renderer';
-import { CHARACTERS } from './characters';
-import { Match, type MatchConfig } from './match';
+import { Keyboard } from '../input/keyboard';
+import { Renderer } from '../render/renderer';
+import {
+  cpuSetup,
+  howToPlay,
+  mainMenu,
+  pauseScreen,
+  postMatch,
+  settingsScreen,
+  type AppActions,
+  type MatchMode,
+} from '../ui/screens';
+import { UI } from '../ui/ui';
+import { CHARACTERS, type CharacterDef } from './characters';
+import { Match } from './match';
 
 const MAX_FRAME = 0.1; // never simulate more than 100 ms per frame (tab switches etc.)
+const POST_MATCH_DELAY = 1.6;
 
-/** Owns the main loop: fixed-step simulation (120 Hz) + interpolated rendering. */
-export class Game {
+const DIFF_LABEL: Record<Difficulty, string> = { easy: 'CPU · лесно', medium: 'CPU · средно', hard: 'CPU · трудно' };
+
+export interface MatchSetup {
+  mode: MatchMode;
+  chars: [CharacterDef, CharacterDef];
+  difficulty: Difficulty;
+  /** for vs-CPU: which keys the human uses */
+  humanScheme: 'wasd' | 'arrows';
+  duration: number;
+}
+
+/** Owns the main loop (fixed 120 Hz simulation + interpolated rendering) and the app flow. */
+export class Game implements AppActions {
   readonly kb = new Keyboard();
   readonly renderer: Renderer;
-  match: Match;
+  readonly ui: UI;
+  settings: Settings = loadSettings();
+  match!: Match;
+  setup!: MatchSetup;
   paused = false;
   /** global time multiplier (slow-mo / hit-stop later) */
   timeScale = 1;
   private acc = 0;
   private last = 0;
   private t = 0;
+  private postShown = false;
 
-  constructor(canvas: HTMLCanvasElement, ui: HTMLElement) {
-    this.renderer = new Renderer(canvas, ui);
-    this.match = this.createMatch();
+  constructor(canvas: HTMLCanvasElement, uiHost: HTMLElement) {
+    this.renderer = new Renderer(canvas, uiHost);
+    this.ui = new UI(uiHost);
     this.kb.onPress((code) => this.onKey(code));
+    this.startDemo();
+    this.showMain();
   }
 
-  private defaultConfig(): MatchConfig {
-    return {
-      chars: [CHARACTERS[0], CHARACTERS[1]],
-      names: [CHARACTERS[0].name, CHARACTERS[1].name],
-      duration: 60,
-    };
-  }
+  // ------------------------------------------------------------------ matches
 
-  createMatch(config: MatchConfig = this.defaultConfig()): Match {
-    const m = new Match(config);
-    m.controllers[0] = new KeyboardController(this.kb, SCHEME_WASD);
-    m.controllers[1] = new KeyboardController(this.kb, SCHEME_ARROWS);
-    this.renderer.fx.attach(m);
+  private startMatch(setup: MatchSetup): void {
+    this.setup = setup;
+    const names: [string, string] = [setup.chars[0].name, setup.chars[1].name];
+    let tags: [string, string];
+    if (setup.mode === 'cpu') tags = ['ТИ', DIFF_LABEL[setup.difficulty]];
+    else if (setup.mode === 'pvp') tags = ['P1 · WASD', 'P2 · СТРЕЛКИ'];
+    else tags = ['CPU', 'CPU'];
+    const m = new Match({ chars: setup.chars, names, tags, duration: setup.duration });
+    if (setup.mode === 'pvp') {
+      m.controllers[0] = new KeyboardController(this.kb, SCHEME_WASD);
+      m.controllers[1] = new KeyboardController(this.kb, SCHEME_ARROWS);
+    } else if (setup.mode === 'cpu') {
+      m.controllers[0] = new KeyboardController(this.kb, setup.humanScheme === 'wasd' ? SCHEME_WASD : SCHEME_ARROWS);
+      m.controllers[1] = new AIController(m, 1, setup.difficulty);
+    } else {
+      m.controllers[0] = new AIController(m, 0, Math.random() < 0.5 ? 'medium' : 'hard');
+      m.controllers[1] = new AIController(m, 1, Math.random() < 0.5 ? 'medium' : 'hard');
+    }
     this.match = m;
+    this.renderer.fx.attach(m);
     this.acc = 0;
-    return m;
+    this.paused = false;
+    this.postShown = false;
+    this.kb.flushPresses();
   }
+
+  private startDemo(): void {
+    const a = Math.floor(Math.random() * CHARACTERS.length);
+    const b = (a + 1) % CHARACTERS.length;
+    this.startMatch({
+      mode: 'demo',
+      chars: [CHARACTERS[a], CHARACTERS[b]],
+      difficulty: 'hard',
+      humanScheme: 'wasd',
+      duration: 90,
+    });
+  }
+
+  private defaultChars(): [CharacterDef, CharacterDef] {
+    return [CHARACTERS[0], CHARACTERS[1]];
+  }
+
+  // ------------------------------------------------------------------ AppActions
+
+  saveSettings(): void {
+    saveSettings(this.settings);
+  }
+
+  showMain(): void {
+    if (this.setup?.mode !== 'demo') this.startDemo();
+    this.ui.show(mainMenu(this));
+  }
+
+  showCpuSetup(): void {
+    this.ui.show(cpuSetup(this));
+  }
+
+  showHowTo(back: () => void): void {
+    this.ui.show(howToPlay(back));
+  }
+
+  showSettings(back: () => void): void {
+    this.ui.show(settingsScreen(this, back));
+  }
+
+  startCpu(): void {
+    this.ui.hide();
+    this.startMatch({
+      mode: 'cpu',
+      chars: this.defaultChars(),
+      difficulty: this.settings.difficulty,
+      humanScheme: this.settings.humanScheme,
+      duration: this.settings.duration,
+    });
+  }
+
+  startPvp(): void {
+    this.ui.hide();
+    this.startMatch({
+      mode: 'pvp',
+      chars: this.defaultChars(),
+      difficulty: this.settings.difficulty,
+      humanScheme: 'wasd',
+      duration: this.settings.duration,
+    });
+  }
+
+  rematch(): void {
+    this.ui.hide();
+    this.startMatch({ ...this.setup });
+  }
+
+  changeHeroes(): void {
+    // Character select arrives in stage 3; for now go back to the match setup.
+    if (this.setup.mode === 'cpu') {
+      this.startDemo();
+      this.showCpuSetup();
+    } else this.showMain();
+  }
+
+  resume(): void {
+    this.ui.hide();
+    this.paused = false;
+    this.kb.flushPresses();
+  }
+
+  restart(): void {
+    this.rematch();
+  }
+
+  quitToMenu(): void {
+    this.paused = false;
+    this.startDemo();
+    this.showMain();
+  }
+
+  // ------------------------------------------------------------------ input
 
   private onKey(code: string): void {
-    if (code === 'Escape' || code === 'KeyP') {
-      if (this.match.phase !== 'ended') this.setPaused(!this.paused);
-    } else if (code === 'F3' || code === 'Backquote') {
+    if (code === 'F3' || code === 'Backquote') {
       this.renderer.showFps = !this.renderer.showFps;
-    } else if (this.match.phase === 'ended' && this.match.phaseT > 0.8 && (code === 'KeyR' || code === 'Enter' || code === 'Space')) {
-      this.createMatch(this.match.config);
+      return;
+    }
+    if (this.ui.active) {
+      this.ui.handleKey(code);
+      return;
+    }
+    if (this.setup.mode !== 'demo' && this.match.phase !== 'ended' && (code === 'Escape' || code === 'KeyP')) {
+      this.paused = true;
+      this.ui.show(pauseScreen(this));
     }
   }
 
-  setPaused(p: boolean): void {
-    this.paused = p;
-    this.kb.flushPresses();
-  }
+  // ------------------------------------------------------------------ loop
 
   start(): void {
     this.last = performance.now();
@@ -75,22 +210,22 @@ export class Game {
         this.acc -= DT;
       }
       this.renderer.update(dtReal);
+      this.checkMatchOver();
     }
-    this.renderer.render(this.match, this.acc / DT, this.t, this.overlay());
+    this.renderer.render(this.match, this.acc / DT, this.t, { hud: this.setup.mode !== 'demo' });
     requestAnimationFrame(this.frame);
   };
 
-  private overlay(): OverlayInfo | null {
+  private checkMatchOver(): void {
     const m = this.match;
-    if (this.paused) return { title: 'ПАУЗА', lines: ['Esc / P — продължи'] };
-    if (m.phase === 'ended' && m.phaseT > 0.6) {
-      const title = m.winner < 0 ? 'РАВЕНСТВО' : `ПОБЕДА: ${m.config.names[m.winner].toUpperCase()}`;
-      return {
-        title,
-        color: m.winner < 0 ? '#ffffff' : '#ffd23f',
-        lines: [`${m.score[0]} : ${m.score[1]}`, 'R / Enter — реванш'],
-      };
+    if (m.phase !== 'ended' || m.phaseT < POST_MATCH_DELAY) return;
+    if (this.setup.mode === 'demo') {
+      this.startDemo();
+      return;
     }
-    return null;
+    if (!this.postShown) {
+      this.postShown = true;
+      this.ui.show(postMatch(this, m, this.setup.mode));
+    }
   }
 }

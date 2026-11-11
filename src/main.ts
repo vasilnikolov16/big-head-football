@@ -2,6 +2,7 @@ import '@fontsource/russo-one/400.css';
 import '@fontsource/rubik/400.css';
 import '@fontsource/rubik/700.css';
 import './style.css';
+import './ui/ui.css';
 import { Game } from './game/game';
 
 async function boot(): Promise<void> {
