@@ -1,4 +1,4 @@
-import { FONT_DISPLAY, FONT_TEXT, H, INK, W } from '../core/constants';
+import { FONT_DISPLAY, FONT_TEXT, H, INK, SCREEN, W } from '../core/constants';
 import { clamp, easeOutBack, lerp } from '../core/math';
 import { t as tx } from '../i18n/i18n';
 import { drawBall, drawBallShadow } from './ballDraw';
@@ -22,6 +22,10 @@ export interface RenderOptions {
   net?: { ping: number | null; note: string | null };
 }
 
+/** How far (world units) the stadium may continue past the pitch on each side before the rest is letterboxed. */
+const MAX_EXTRA_X = 380;
+const MAX_EXTRA_Y = 170;
+
 const EMOJI_FONT = '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
 
 export class Renderer {
@@ -33,6 +37,9 @@ export class Renderer {
   private lastDt = 0;
   scale = 1;
   cssScale = 1;
+  /** world units shown left of / above the pitch */
+  ox = 0;
+  oy = 0;
   showFps = false;
   private fps = 60;
   private fpsAcc = 0;
@@ -45,15 +52,28 @@ export class Renderer {
     this.ctx = ctx;
     this.resize();
     window.addEventListener('resize', () => this.resize());
+    // iOS reports the new size a moment after rotating
+    window.addEventListener('orientationchange', () => window.setTimeout(() => this.resize(), 250));
+    window.visualViewport?.addEventListener('resize', () => this.resize());
   }
+
+  private lastSize = '';
 
   resize(): void {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const s = Math.min(vw / W, vh / H);
-    const cssW = Math.floor(W * s);
-    const cssH = Math.floor(H * s);
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const key = `${vw}x${vh}@${dpr}`;
+    if (key === this.lastSize) return;
+    this.lastSize = key;
+    // the whole pitch always fits; the stadium fills the rest of the screen
+    const s = Math.min(vw / W, vh / H);
+    const ox = Math.min(MAX_EXTRA_X, Math.max(0, (vw / s - W) / 2));
+    const oy = Math.min(MAX_EXTRA_Y, Math.max(0, (vh / s - H) / 2));
+    const lw = W + ox * 2;
+    const lh = H + oy * 2;
+    const cssW = Math.min(vw, Math.round(lw * s));
+    const cssH = Math.min(vh, Math.round(lh * s));
     this.canvas.style.width = `${cssW}px`;
     this.canvas.style.height = `${cssH}px`;
     const stage = this.canvas.parentElement!;
@@ -61,14 +81,22 @@ export class Renderer {
     stage.style.height = `${cssH}px`;
     this.canvas.width = Math.round(cssW * dpr);
     this.canvas.height = Math.round(cssH * dpr);
-    this.scale = this.canvas.width / W;
+    this.scale = this.canvas.width / lw;
     this.cssScale = s;
-    // UI layer is authored in logical 1280x720 units and scaled as a whole.
-    this.ui.style.width = `${W}px`;
-    this.ui.style.height = `${H}px`;
+    this.ox = ox;
+    this.oy = oy;
+    SCREEN.x = -ox;
+    SCREEN.y = -oy;
+    SCREEN.w = lw;
+    SCREEN.h = lh;
+    // The UI layer is authored in logical units (the pitch is 1280x720) and scaled as a whole;
+    // it covers the whole screen, so menus and touch buttons can use the extra room.
+    this.ui.style.width = `${lw}px`;
+    this.ui.style.height = `${lh}px`;
     this.ui.style.transformOrigin = '0 0';
     this.ui.style.transform = `scale(${s})`;
-    this.stadium.build(this.scale);
+    this.ui.style.setProperty('--ui-scale', String(s));
+    this.stadium.build(this.scale, ox, oy);
   }
 
   update(dtReal: number): void {
@@ -99,7 +127,8 @@ export class Renderer {
     // world transform + screen shake
     const sx = fx.shake > 0 ? (Math.random() * 2 - 1) * fx.shake : 0;
     const sy = fx.shake > 0 ? (Math.random() * 2 - 1) * fx.shake * 0.7 : 0;
-    ctx.setTransform(this.scale, 0, 0, this.scale, sx * this.scale, sy * this.scale);
+    const k = this.scale;
+    ctx.setTransform(k, 0, 0, k, (this.ox + sx) * k, (this.oy + sy) * k);
 
     // super-shot cinematic: zoom the camera on the shooter
     const cin = fx.cinematic;
@@ -165,10 +194,10 @@ export class Renderer {
     if (cin.active) cin.drawWorld(ctx, focusX, focusY, t);
 
     // HUD does not shake
-    ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0);
+    ctx.setTransform(k, 0, 0, k, this.ox * k, this.oy * k);
     if (fx.flash > 0) {
       ctx.fillStyle = `rgba(255,255,240,${fx.flash * 0.55})`;
-      ctx.fillRect(0, 0, W, H);
+      ctx.fillRect(SCREEN.x, SCREEN.y, SCREEN.w, SCREEN.h);
     }
     if (replay) this.drawReplayOverlay(ctx, opts.replayT ?? 0);
     else if (opts.hud) {
@@ -289,7 +318,7 @@ export class Renderer {
     if (net.note) {
       ctx.save();
       ctx.fillStyle = 'rgba(5,4,20,0.45)';
-      ctx.fillRect(0, 0, W, H);
+      ctx.fillRect(SCREEN.x, SCREEN.y, SCREEN.w, SCREEN.h);
       ctx.font = `30px ${FONT_DISPLAY}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -357,12 +386,13 @@ export class Renderer {
   /** Cinema bars, "ПОВТОРЕНИЕ" badge, film grain lines. */
   private drawReplayOverlay(ctx: CanvasRenderingContext2D, t: number): void {
     const bar = Math.min(1, t / 0.3) * 62;
+    const S = SCREEN;
     ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, W, bar);
-    ctx.fillRect(0, H - bar, W, bar);
+    ctx.fillRect(S.x, S.y, S.w, bar - S.y);
+    ctx.fillRect(S.x, H - bar, S.w, bar + S.y + S.h - H);
     // subtle sepia-ish tint
     ctx.fillStyle = 'rgba(40,30,80,0.12)';
-    ctx.fillRect(0, bar, W, H - bar * 2);
+    ctx.fillRect(S.x, bar, S.w, H - bar * 2);
     ctx.save();
     ctx.textBaseline = 'middle';
     ctx.font = `30px ${FONT_DISPLAY}`;

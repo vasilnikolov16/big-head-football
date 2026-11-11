@@ -30,3 +30,10 @@ async function boot(): Promise<void> {
 }
 
 void boot();
+
+// installed app (Add to Home Screen): works offline after the first visit
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}

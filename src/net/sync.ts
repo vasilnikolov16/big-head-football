@@ -1,7 +1,7 @@
 import { lerp } from '../core/math';
 import type { GameEvents } from '../core/events';
 import { t, tr } from '../i18n/i18n';
-import type { Controller, PlayerIntent } from '../input/controls';
+import { emptyIntent, type Controller, type PlayerIntent } from '../input/controls';
 import type { Expression, SuperId } from '../game/characters';
 import type { Match } from '../game/match';
 import type { Player } from '../game/player';
@@ -25,8 +25,8 @@ export const HOST_STALE_MS = 700;
 export class RemoteController implements Controller {
   private move = 0;
   private jumpHeld = false;
-  private counts: [number, number, number] = [0, 0, 0];
-  private used: [number, number, number] = [0, 0, 0];
+  private counts = [0, 0, 0, 0, 0];
+  private used = [0, 0, 0, 0, 0];
   private lastSeq = -1;
   /** host clock of the last input */
   lastAt = performance.now();
@@ -43,7 +43,7 @@ export class RemoteController implements Controller {
     this.lastAt = performance.now();
     this.move = m.m < 0 ? -1 : m.m > 0 ? 1 : 0;
     this.jumpHeld = m.j === 1;
-    if (Array.isArray(m.c)) for (let i = 0; i < 3; i++) this.counts[i] = Math.max(this.counts[i], Number(m.c[i]) || 0);
+    if (Array.isArray(m.c)) for (let i = 0; i < 5; i++) this.counts[i] = Math.max(this.counts[i], Number(m.c[i]) || 0);
   }
 
   read(out: PlayerIntent): void {
@@ -60,6 +60,7 @@ export class RemoteController implements Controller {
     out.jumpPressed = take(0);
     out.kickPressed = take(1);
     out.superPressed = take(2);
+    out.dash = take(3) ? -1 : take(4) ? 1 : 0;
   }
 }
 
@@ -87,6 +88,8 @@ const packPlayer = (p: Player): PlayerPack => [
   r3(p.energy),
   r2(p.reversedT),
   r2(p.jumpBoostT),
+  r3(p.dashT),
+  p.dashDir,
 ];
 
 /**
@@ -184,8 +187,8 @@ type EventName2 = (typeof EVENT_NAMES)[number];
 /** What the guest's player sends: held buttons + cumulative press counters. */
 export class GuestInputSender {
   private seq = 0;
-  private counts: [number, number, number] = [0, 0, 0];
-  private intent: PlayerIntent = { move: 0, jumpHeld: false, jumpPressed: false, kickPressed: false, superPressed: false };
+  private counts: GuestInput['c'] = [0, 0, 0, 0, 0];
+  private intent: PlayerIntent = emptyIntent();
   private lastMove = 0;
   private lastJump = false;
   private lastSent = 0;
@@ -203,18 +206,21 @@ export class GuestInputSender {
     if (!enabled) {
       it.move = 0;
       it.jumpHeld = it.jumpPressed = it.kickPressed = it.superPressed = false;
+      it.dash = 0;
     }
     let changed = it.move !== this.lastMove || it.jumpHeld !== this.lastJump;
     if (it.jumpPressed) this.counts[0]++;
     if (it.kickPressed) this.counts[1]++;
     if (it.superPressed) this.counts[2]++;
-    changed ||= it.jumpPressed || it.kickPressed || it.superPressed;
+    if (it.dash < 0) this.counts[3]++;
+    if (it.dash > 0) this.counts[4]++;
+    changed ||= it.jumpPressed || it.kickPressed || it.superPressed || it.dash !== 0;
     // send on every change, otherwise ~60 times a second so a lost packet is repaired quickly
     if (!changed && now - this.lastSent < 16) return;
     this.lastMove = it.move;
     this.lastJump = it.jumpHeld;
     this.lastSent = now;
-    const msg: GuestInput = { t: 'in', mid: this.mid, n: this.seq++, m: it.move, j: it.jumpHeld ? 1 : 0, c: [...this.counts] };
+    const msg: GuestInput = { t: 'in', mid: this.mid, n: this.seq++, m: it.move, j: it.jumpHeld ? 1 : 0, c: [...this.counts] as GuestInput['c'] };
     this.room.send(msg, true);
   }
 }
@@ -393,6 +399,8 @@ export class GuestSync {
       p.energy = pb[20];
       p.reversedT = pb[21];
       p.jumpBoostT = pb[22];
+      p.dashT = pb[23] ?? 0;
+      p.dashDir = pb[24] ?? 0;
     }
 
     if (m.arena.goalTop[0] !== b.gt[0]) m.arena.setGoalTop(0, b.gt[0]);

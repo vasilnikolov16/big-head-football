@@ -51,7 +51,7 @@ const GOAL_TIME = 2.6;
 const BALL_DROP_Y = 170;
 const KICKOFF_SHIFT = 90;
 /** super energy gained per second just by playing (like the classic power gauge) */
-const ENERGY_PER_SEC = 1 / 26;
+const ENERGY_PER_SEC = 1 / 50;
 
 export class Match {
   readonly events = new Emitter<GameEvents>();
@@ -178,7 +178,7 @@ export class Match {
       if (this.phase === 'playing') p.addEnergy(dt * ENERGY_PER_SEC);
       p.update(dt, controllable && ctrl ? intent : this.idle, this.arena, this.events);
     }
-    playerVsPlayer(this.players[0], this.players[1]);
+    playerVsPlayer(this.players[0], this.players[1], this.events);
 
     // eyes follow the ball
     for (const p of this.players) {

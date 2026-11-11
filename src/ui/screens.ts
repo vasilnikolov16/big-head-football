@@ -43,6 +43,15 @@ function logo(): HTMLElement {
   return h('div', 'logo-wrap', undefined, [wrap, sub]);
 }
 
+/** Phones in the browser: how to install the game as a full-screen app. */
+function installTip(): string | null {
+  const nav = navigator as Navigator & { standalone?: boolean };
+  const installed = nav.standalone === true || matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches;
+  if (installed) return null;
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  return t(ios ? 'menu.installIos' : 'menu.installAndroid');
+}
+
 function hints(text: string): HTMLElement {
   return h('div', 'hints', text);
 }
@@ -76,6 +85,10 @@ export function mainMenu(app: AppActions): Screen {
   for (const it of items) list.append(it.el);
   root.append(list);
   if (!app.touchMode) root.append(hints(t('menu.hints')));
+  else {
+    const tip = installTip();
+    if (tip) root.append(hints(tip));
+  }
   return { id: 'main', root, items };
 }
 
@@ -113,6 +126,7 @@ function controlsCard(title: string, color: string, b: Binding): HTMLElement {
     [bindingCaps(b.jump), t('howto.jump')],
     [bindingCaps(b.kick), t('howto.kick')],
     [bindingCaps(b.super), t('howto.super')],
+    [[...bindingCaps(b.left).slice(0, 1), ...bindingCaps(b.left).slice(0, 1)], t('howto.dash')],
   ];
   for (const [caps, label] of rows) {
     const row = h('div', 'ctrl-row');
@@ -132,9 +146,9 @@ function touchCard(): HTMLElement {
   for (const [cls, txt] of [
     ['l', '◀'],
     ['r', '▶'],
-    ['j', '⬆'],
-    ['k', '👟'],
     ['s', '⚡'],
+    ['k', '👟'],
+    ['j', '⬆'],
   ])
     demo.append(h('span', `td td-${cls}`, txt));
   card.append(demo, h('p', 'ctrl-label', t('howto.touch')));
@@ -151,7 +165,7 @@ export function howToPlay(app: AppActions, back: () => void): Screen {
       controlsCard(t('controls.p2'), '#2f8cff', app.settings.controls.p2),
     );
   const tips = h('ul', 'tips');
-  for (const k of ['howto.tip1', 'howto.tip2', 'howto.tip3', 'howto.tip4', 'howto.tip5', 'howto.tip6', 'howto.tip7']) tips.append(h('li', '', t(k)));
+  for (const k of ['howto.tip1', 'howto.tip2', 'howto.tip3', 'howto.tip4', 'howto.tip5', 'howto.tip8', 'howto.tip6', 'howto.tip7']) tips.append(h('li', '', t(k)));
   const ok = button(t('howto.ok'), back, 'btn btn-go btn-small');
   body.append(cards, tips, h('div', 'row-buttons', undefined, [ok.el]));
   return { id: 'howto', root, items: [ok], back };

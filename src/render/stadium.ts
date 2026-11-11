@@ -60,22 +60,31 @@ export class Stadium {
   /** which side the crowd is cheering for (-1 none, 0 left, 1 right) */
   cheerSide = -1;
 
+  /** margins of the cached layers: screen shake + the stadium past the pitch on wide/tall screens */
+  private mx = BG_MARGIN;
+  private my = BG_MARGIN;
+  private fansFor = -1;
+
   constructor() {
-    this.buildFans();
+    this.buildFans(0);
   }
 
-  build(scale: number): void {
-    const m = BG_MARGIN;
-    this.bg = makeCanvas((W + m * 2) * scale, (H + m * 2) * scale);
+  /** ox, oy: how far the screen shows past the pitch on each side */
+  build(scale: number, ox = 0, oy = 0): void {
+    const mx = (this.mx = BG_MARGIN + Math.ceil(ox));
+    const my = (this.my = BG_MARGIN + Math.ceil(oy));
+    if (this.fansFor !== Math.ceil(ox)) this.buildFans(Math.ceil(ox));
+    this.bg = makeCanvas((W + mx * 2) * scale, (H + my * 2) * scale);
     const g = this.bg.getContext('2d')!;
-    g.setTransform(scale, 0, 0, scale, m * scale, m * scale);
+    g.setTransform(scale, 0, 0, scale, mx * scale, my * scale);
     this.drawSky(g);
     this.drawStructure(g);
     this.drawGrass(g);
+    this.drawOutside(g);
 
-    this.lights = makeCanvas((W + m * 2) * scale, (H + m * 2) * scale);
+    this.lights = makeCanvas((W + mx * 2) * scale, (H + my * 2) * scale);
     const l = this.lights.getContext('2d')!;
-    l.setTransform(scale, 0, 0, scale, m * scale, m * scale);
+    l.setTransform(scale, 0, 0, scale, mx * scale, my * scale);
     this.drawLightLayer(l);
 
     this.buildSprites(Math.min(3, scale * 1.5));
@@ -83,15 +92,16 @@ export class Stadium {
 
   // ---------------------------------------------------------------- crowd
 
-  private buildFans(): void {
+  private buildFans(ox: number): void {
     const rnd = mulberry32(1337);
     this.fans = [];
+    this.fansFor = ox;
     const rows: Array<{ y: number; s: number }> = [];
     for (let i = 0; i < 6; i++) rows.push({ y: 128 + i * 20, s: 0.68 + i * 0.02 });
     for (let i = 0; i < 8; i++) rows.push({ y: 296 + i * 21, s: 0.84 + i * 0.022 });
     for (const row of rows) {
       const step = 17 * row.s + 2;
-      for (let x = 6 + rnd() * 8; x < W - 4; x += step + rnd() * 6) {
+      for (let x = -ox + 6 + rnd() * 8; x < W + ox - 4; x += step + rnd() * 6) {
         if (rnd() < 0.07) continue; // empty seat
         const side = x < W / 2 - 40 ? 0 : x > W / 2 + 40 ? 1 : 2;
         this.fans.push({
@@ -209,23 +219,25 @@ export class Stadium {
   // ---------------------------------------------------------------- static layers
 
   private drawSky(g: CanvasRenderingContext2D): void {
-    const m = BG_MARGIN;
+    const mx = this.mx;
+    const m = this.my;
     const sky = g.createLinearGradient(0, -m, 0, 320);
     sky.addColorStop(0, '#050722');
     sky.addColorStop(0.5, '#141a4a');
     sky.addColorStop(1, '#2b1f5e');
     g.fillStyle = sky;
-    g.fillRect(-m, -m, W + m * 2, H + m * 2);
+    g.fillRect(-mx, -m, W + mx * 2, H + m * 2);
     const rnd = mulberry32(7);
-    for (let i = 0; i < 90; i++) {
+    const stars = Math.round(90 * ((W + mx * 2) / W) * ((100 + m) / (100 + BG_MARGIN)));
+    for (let i = 0; i < stars; i++) {
       g.fillStyle = `rgba(255,255,255,${0.2 + rnd() * 0.6})`;
       const s = rnd() * 1.6 + 0.4;
-      g.fillRect(rnd() * W, rnd() * 100 - m, s, s);
+      g.fillRect(-mx + rnd() * (W + mx * 2), rnd() * (100 + m) - m, s, s);
     }
   }
 
   private drawStructure(g: CanvasRenderingContext2D): void {
-    const m = BG_MARGIN;
+    const m = this.mx;
     // roof silhouette
     g.fillStyle = '#0d0f2a';
     g.beginPath();
@@ -238,7 +250,7 @@ export class Stadium {
     // roof truss lines
     g.strokeStyle = 'rgba(120,130,220,0.18)';
     g.lineWidth = 1.5;
-    for (let x = -20; x < W + 20; x += 40) {
+    for (let x = -m - 20; x < W + m + 20; x += 40) {
       g.beginPath();
       g.moveTo(x, 70);
       g.lineTo(x + 20, 100);
@@ -269,7 +281,7 @@ export class Stadium {
     }
     // aisles (stairs)
     g.fillStyle = 'rgba(0,0,0,0.22)';
-    for (const ax of [210, 640, 1070]) {
+    for (const ax of [210 - 430, 210, 640, 1070, 1070 + 430]) {
       g.fillRect(ax - 9, 100, 18, 152);
       g.fillRect(ax - 11, 270, 22, 188);
     }
@@ -285,7 +297,7 @@ export class Stadium {
     g.fillRect(-m, 254, W + m * 2, 3);
     g.globalAlpha = 1;
     g.fillStyle = 'rgba(255,255,255,0.08)';
-    for (let x = 0; x < W; x += 64) g.fillRect(x, 260, 30, 6);
+    for (let x = -Math.ceil(m / 64) * 64; x < W + m; x += 64) g.fillRect(x, 260, 30, 6);
 
     // light tower structures
     for (const lamp of LAMPS) {
@@ -313,16 +325,16 @@ export class Stadium {
     g.fillStyle = '#1b1b30';
     g.fillRect(-m, 456, W + m * 2, 4);
     g.fillRect(-m, 498, W + m * 2, 4);
-    for (let x = 0; x <= W; x += W / 6) {
+    for (let x = -Math.ceil(m / (W / 6)) * (W / 6); x <= W + m; x += W / 6) {
       g.fillStyle = '#1b1b30';
       g.fillRect(x - 2, 456, 4, 46);
     }
   }
 
   private drawGrass(g: CanvasRenderingContext2D): void {
-    const m = BG_MARGIN;
+    const m = this.mx;
     const top = GRASS_TOP;
-    const bottom = H + m;
+    const bottom = H + this.my;
     const base = g.createLinearGradient(0, top, 0, bottom);
     base.addColorStop(0, '#2f8f3a');
     base.addColorStop(0.45, '#3fae45');
@@ -331,12 +343,12 @@ export class Stadium {
     g.fillRect(-m, top, W + m * 2, bottom - top);
 
     // perspective mowing stripes
-    const stripes = 16;
     const farK = 0.86;
-    const sw = (W + m * 2) / stripes;
-    for (let i = 0; i < stripes; i++) {
+    const sw = (W + BG_MARGIN * 2) / 16;
+    const first = -Math.ceil((m - BG_MARGIN) / (sw * 2)) * 2;
+    for (let i = first; -BG_MARGIN + i * sw < W + m; i++) {
       if (i % 2) continue;
-      const x0 = -m + i * sw;
+      const x0 = -BG_MARGIN + i * sw;
       const x1 = x0 + sw;
       const f0 = W / 2 + (x0 - W / 2) * farK;
       const f1 = W / 2 + (x1 - W / 2) * farK;
@@ -352,9 +364,10 @@ export class Stadium {
 
     // grass speckles
     const rnd = mulberry32(42);
-    for (let i = 0; i < 2600; i++) {
+    const specks = Math.round(2600 * ((W + m * 2) / W) * ((bottom - top) / (H + BG_MARGIN - top)));
+    for (let i = 0; i < specks; i++) {
       const y = top + rnd() * (bottom - top);
-      const x = rnd() * W;
+      const x = -m + rnd() * (W + m * 2);
       g.fillStyle = rnd() < 0.5 ? 'rgba(20,70,25,0.35)' : 'rgba(160,240,140,0.12)';
       g.fillRect(x, y, 1.2, 2.5 + rnd() * 2);
     }
@@ -406,6 +419,48 @@ export class Stadium {
     g.fillRect(-m, top, W + m * 2, 30);
   }
 
+  /**
+   * Past the goals (only visible on wide screens): a glass wall above each goal
+   * (that's what the ball bounces off) and slightly darker surroundings.
+   */
+  private drawOutside(g: CanvasRenderingContext2D): void {
+    const mx = this.mx;
+    const my = this.my;
+    if (mx <= BG_MARGIN + 2) return;
+    for (const side of [0, 1]) {
+      const dir = side === 0 ? -1 : 1;
+      const edge = side === 0 ? 0 : W;
+      const far = side === 0 ? -mx : W + mx;
+      // darker outside
+      const shade = g.createLinearGradient(edge, 0, far, 0);
+      shade.addColorStop(0, 'rgba(4,4,16,0.18)');
+      shade.addColorStop(1, 'rgba(4,4,16,0.5)');
+      g.fillStyle = shade;
+      g.fillRect(Math.min(edge, far), -my, mx, H + my * 2);
+      // glass wall: a faint pane with a bright edge
+      const x0 = side === 0 ? -10 : W;
+      g.fillStyle = 'rgba(170,205,255,0.07)';
+      g.fillRect(x0, -my, 10, GROUND_Y + my);
+      g.strokeStyle = 'rgba(200,230,255,0.38)';
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(edge, -my);
+      g.lineTo(edge, GROUND_Y);
+      g.stroke();
+      g.strokeStyle = 'rgba(255,255,255,0.16)';
+      g.lineWidth = 3;
+      for (const y of [60, 150, 300]) {
+        g.beginPath();
+        g.moveTo(edge + dir * 3, y);
+        g.lineTo(edge + dir * 9, y - 26);
+        g.stroke();
+      }
+      // posts holding the glass
+      g.fillStyle = '#1d1f45';
+      for (const y of [100, 248, 456]) g.fillRect(edge + (side === 0 ? -14 : 0), y, 14, 6);
+    }
+  }
+
   private drawLightLayer(g: CanvasRenderingContext2D): void {
     // soft beams, drawn additively over the crowd and the pitch
     for (const lamp of LAMPS) {
@@ -438,15 +493,15 @@ export class Stadium {
   // ---------------------------------------------------------------- per frame
 
   drawBackground(ctx: CanvasRenderingContext2D): void {
-    const m = BG_MARGIN;
-    ctx.drawImage(this.bg, -m, -m, W + m * 2, H + m * 2);
+    const { mx, my } = this;
+    ctx.drawImage(this.bg, -mx, -my, W + mx * 2, H + my * 2);
   }
 
   drawLights(ctx: CanvasRenderingContext2D): void {
-    const m = BG_MARGIN;
+    const { mx, my } = this;
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.drawImage(this.lights, -m, -m, W + m * 2, H + m * 2);
+    ctx.drawImage(this.lights, -mx, -my, W + mx * 2, H + my * 2);
     ctx.restore();
   }
 
@@ -456,7 +511,8 @@ export class Stadium {
     ctx.font = `20px ${FONT_DISPLAY}`;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
-    for (let i = 0; i < 6; i++) {
+    const extra = Math.ceil((this.mx - BG_MARGIN) / segW);
+    for (let i = -extra; i < 6 + extra; i++) {
       const x0 = i * segW + 3;
       ctx.save();
       ctx.beginPath();

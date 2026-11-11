@@ -1170,85 +1170,112 @@
   z-index: 1;
   pointer-events: none;
   touch-action: none;
+  /* keep the buttons clear of the notch / Dynamic Island and the home bar (in UI units) */
+  --sl: calc(env(safe-area-inset-left, 0px) / var(--ui-scale, 1));
+  --sr: calc(env(safe-area-inset-right, 0px) / var(--ui-scale, 1));
+  --sb: calc(env(safe-area-inset-bottom, 0px) / var(--ui-scale, 1) * 0.6);
+  --st: calc(env(safe-area-inset-top, 0px) / var(--ui-scale, 1));
+  --edge: 26px;
+  --low: 16px;
+  --gap: 14px;
+  --mw: 168px;
+  --aw: 176px;
 }
 .tbtn {
   position: absolute;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  border: 4px solid rgba(255, 255, 255, 0.55);
-  background: rgba(10, 8, 30, 0.35);
-  color: #fff;
+  gap: 2px;
+  border-radius: 30px;
+  border: 4px solid rgba(255, 232, 160, 0.85);
+  background: linear-gradient(180deg, rgba(255, 206, 84, 0.4), rgba(150, 82, 12, 0.45));
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, 0.28),
+    0 5px 0 rgba(0, 0, 0, 0.3);
+  color: #fff6d6;
   font-size: 46px;
   pointer-events: auto;
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
+  -webkit-touch-callout: none;
   transition:
     transform 0.06s,
     background 0.06s;
 }
 .tbtn span {
   pointer-events: none;
-  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.5);
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.45);
+  line-height: 1;
+}
+.tb-label {
+  font-family: var(--display);
+  font-size: 23px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.tb-super .tb-icon,
+.tb-kick .tb-icon,
+.tb-jump .tb-icon {
+  font-size: 40px;
 }
 .tbtn.down {
-  transform: scale(0.9);
-  background: rgba(255, 210, 63, 0.45);
-  border-color: #fff;
+  transform: scale(0.92);
+  background: linear-gradient(180deg, rgba(255, 226, 120, 0.75), rgba(200, 120, 20, 0.7));
+  border-color: #ffffff;
+}
+.tb-left,
+.tb-right {
+  bottom: calc(var(--sb) + var(--low));
+  width: var(--mw);
+  height: 112px;
+  font-size: 58px;
 }
 .tb-left {
-  left: 36px;
-  bottom: 30px;
-  width: 140px;
-  height: 140px;
+  left: calc(var(--sl) + var(--edge));
 }
 .tb-right {
-  left: 196px;
-  bottom: 30px;
-  width: 140px;
-  height: 140px;
+  left: calc(var(--sl) + var(--edge) + var(--mw) + var(--gap));
 }
-.tb-kick {
-  right: 36px;
-  bottom: 30px;
-  width: 150px;
-  height: 150px;
-  font-size: 54px;
+.tb-super,
+.tb-kick,
+.tb-jump {
+  bottom: calc(var(--sb) + var(--low));
+  width: var(--aw);
+  height: 112px;
 }
 .tb-jump {
-  right: 206px;
-  bottom: 30px;
-  width: 130px;
-  height: 130px;
+  right: calc(var(--sr) + var(--edge));
+}
+.tb-kick {
+  right: calc(var(--sr) + var(--edge) + var(--aw) + var(--gap));
 }
 .tb-super {
-  right: 120px;
-  bottom: 200px;
-  width: 110px;
-  height: 110px;
-  font-size: 42px;
-  opacity: 0.35;
+  right: calc(var(--sr) + var(--edge) + (var(--aw) + var(--gap)) * 2);
+  opacity: 0.5;
+  filter: saturate(0.4);
 }
 .tb-super.ready {
   opacity: 1;
-  border-color: var(--gold);
-  background: rgba(255, 210, 63, 0.35);
+  filter: none;
+  border-color: #fff3b0;
+  background: linear-gradient(180deg, rgba(255, 220, 70, 0.8), rgba(230, 120, 0, 0.75));
   animation: superPulse 0.8s ease-in-out infinite;
 }
 .tb-super.charged {
-  background: rgba(255, 255, 255, 0.5);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(255, 210, 63, 0.7));
 }
 @keyframes superPulse {
   50% {
     box-shadow: 0 0 40px rgba(255, 210, 63, 0.9);
-    transform: scale(1.08);
+    transform: scale(1.06);
   }
 }
 .tb-pause {
-  left: 18px;
-  top: 14px;
+  left: calc(var(--sl) + 18px);
+  top: calc(var(--st) + 14px);
   width: 66px;
   height: 66px;
   font-size: 22px;
@@ -1281,19 +1308,16 @@
   left: 62px;
 }
 .td-j {
-  right: 72px;
+  right: 0;
+  border-radius: 16px;
 }
 .td-k {
-  right: 0;
-  width: 62px;
-  height: 62px;
+  right: 62px;
+  border-radius: 16px;
 }
 .td-s {
-  right: 38px;
-  bottom: 58px;
-  width: 40px;
-  height: 40px;
-  font-size: 18px;
+  right: 124px;
+  border-radius: 16px;
   border-color: var(--gold);
 }
 
@@ -1827,8 +1851,8 @@
 
 /* touch: emotes */
 .tb-emote {
-  left: 96px;
-  top: 14px;
+  left: calc(var(--sl) + 96px);
+  top: calc(var(--st) + 14px);
   width: 66px;
   height: 66px;
   font-size: 30px;
@@ -1836,8 +1860,8 @@
 }
 .emote-row {
   position: absolute;
-  left: 176px;
-  top: 14px;
+  left: calc(var(--sl) + 176px);
+  top: calc(var(--st) + 14px);
   display: none;
   gap: 8px;
   pointer-events: auto;

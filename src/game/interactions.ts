@@ -6,15 +6,17 @@ import type { Player } from './player';
 
 const c = makeContact();
 
-const HEADER_MIN_POP = 330;
-const HEADER_FORWARD = 140;
-const HEADER_MAX = 430;
+const HEADER_MIN_POP = 280;
+const HEADER_FORWARD = 110;
+const HEADER_MAX = 370;
+/** absolute speed cap of a header: standing, plus what a jump / dash adds */
+const HEADER_ABS = 470;
 const KICK_REACH_BONUS = 13;
 const KICK_ACTIVE_FROM = 0.18;
 // super energy gained per action (1 = full bar)
-const ENERGY_TOUCH = 0.009;
-const ENERGY_KICK = 0.022;
-const ENERGY_HEADER = 0.008;
+const ENERGY_TOUCH = 0.004;
+const ENERGY_KICK = 0.015;
+const ENERGY_HEADER = 0.003;
 const KICK_SWEET = 0.42;
 
 export interface KickResult {
@@ -63,11 +65,11 @@ function tryKick(ball: Ball, p: Player, events: Emitter<GameEvents>): boolean {
   if ((ball.x - p.x) * p.facing < -6) return false;
 
   // Sweet spot: the ball meets the foot mid-swing (press kick just before it arrives).
-  const sweet = 1 - clamp(Math.abs(phase - KICK_SWEET) / 0.45, 0, 1);
+  const sweet = 1 - clamp(Math.abs(phase - KICK_SWEET) / 0.34, 0, 1);
   const power = 0.5 + 0.5 * sweet;
   let elev = lerp(0.5, 1.1, clamp((phase - KICK_ACTIVE_FROM) / (1 - KICK_ACTIVE_FROM), 0, 1)); // ~29°..63°
   if (ball.y < p.hipY - 14) elev *= 0.55; // volleys fly flatter
-  const speed = (760 + 650 * power) * p.power * (p.fireT > 0 ? 1.22 : 1);
+  const speed = (600 + 520 * power) * p.power * (p.fireT > 0 ? 1.22 : 1);
   ball.vx = p.facing * Math.cos(elev) * speed + p.vx * 0.35;
   ball.vy = -Math.sin(elev) * speed + Math.min(p.vy, 0) * 0.25;
   ball.spin = -p.facing * (8 + 22 * phase); // backspin -> the ball floats
@@ -102,7 +104,7 @@ export function ballVsPlayer(ball: Ball, p: Player, events: Emitter<GameEvents>)
         ball.vy += c.ny * add;
       }
       // A standing header is a soft cushion; jumping into the ball adds real power.
-      const maxOut = HEADER_MAX + Math.max(0, -p.vy) * 0.3;
+      const maxOut = HEADER_MAX + Math.max(0, -p.vy) * 0.2;
       const out = Math.hypot(ball.vx - p.vx, ball.vy - p.vy);
       if (out > maxOut) {
         const k = maxOut / out;
@@ -113,6 +115,13 @@ export function ballVsPlayer(ball: Ball, p: Player, events: Emitter<GameEvents>)
       if (c.ny < 0.35) {
         if (ball.vx * p.facing < 0) ball.vx *= 0.45;
         ball.vx += p.facing * HEADER_FORWARD;
+      }
+      // The ball is heavy: a header can't send it across the whole pitch.
+      const abs = HEADER_ABS + Math.max(0, -p.vy) * 0.3 + Math.abs(p.vx) * 0.25;
+      const sp = Math.hypot(ball.vx, ball.vy);
+      if (sp > abs) {
+        ball.vx *= abs / sp;
+        ball.vy *= abs / sp;
       }
       registerTouch(ball, p, events);
       if (impact > 160) {
@@ -158,7 +167,7 @@ export function separatePlayerFromBall(ball: Ball, p: Player): void {
 }
 
 /** Players push each other and can stand on each other's heads. */
-export function playerVsPlayer(a: Player, b: Player): void {
+export function playerVsPlayer(a: Player, b: Player, events?: Emitter<GameEvents>): void {
   const sa: Array<[number, number, number]> = [
     [a.headX, a.headY, a.headR],
     [a.bodyX, a.bodyY, a.bodyR],
@@ -183,6 +192,21 @@ export function playerVsPlayer(a: Player, b: Player): void {
         // slide off slowly so nobody can camp on a head forever
         top.vx += (top === a ? c.nx : -c.nx) * 30;
       } else {
+        // a dash into the other player knocks them back (a shoulder charge)
+        const hitter = a.dashT > 0 && a.dashDir * (b.x - a.x) > 0 ? a : b.dashT > 0 && b.dashDir * (a.x - b.x) > 0 ? b : null;
+        if (hitter && events) {
+          const victim = hitter === a ? b : a;
+          const force = Math.abs(hitter.vx);
+          victim.vx = hitter.dashDir * Math.min(560, 240 + force * 0.35);
+          if (victim.grounded) victim.vy = -260;
+          victim.grounded = false;
+          victim.stunT = Math.max(victim.stunT, 0.32);
+          victim.setExpression('shock', 0.6);
+          victim.kickT = -1;
+          hitter.vx *= 0.25;
+          hitter.dashT = 0;
+          events.emit('bump', { player: victim.index, x: (a.x + b.x) / 2, y: Math.min(ay, by), force });
+        }
         a.x += c.nx * half;
         b.x -= c.nx * half;
         const rel = (a.vx - b.vx) * c.nx;

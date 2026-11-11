@@ -1,4 +1,4 @@
-import { DT, GOAL_DEPTH, GROUND_Y, PLAYER_GRAVITY, W } from '../core/constants';
+import { BALL_GRAVITY, DT, GOAL_DEPTH, GROUND_Y, PLAYER_GRAVITY, W } from '../core/constants';
 import { clamp, rand, sign } from '../core/math';
 import type { Controller, PlayerIntent } from '../input/controls';
 import { Ball, makeImpactLog, stepBall } from '../physics/ball';
@@ -30,6 +30,8 @@ interface Profile {
   jumpOver: number;
   /** chance per decision to arm the super shot when it is ready and the ball is close */
   superUse: number;
+  /** chance per decision to dash when it has to cover a long way quickly */
+  dash: number;
 }
 
 const PROFILES: Record<Difficulty, Profile> = {
@@ -45,6 +47,7 @@ const PROFILES: Record<Difficulty, Profile> = {
     kickChance: 0.4,
     jumpOver: 0.2,
     superUse: 0.25,
+    dash: 0.06,
   },
   medium: {
     think: 0.15,
@@ -58,6 +61,7 @@ const PROFILES: Record<Difficulty, Profile> = {
     kickChance: 0.7,
     jumpOver: 0.6,
     superUse: 0.6,
+    dash: 0.2,
   },
   hard: {
     think: 0.06,
@@ -71,6 +75,7 @@ const PROFILES: Record<Difficulty, Profile> = {
     kickChance: 1,
     jumpOver: 1,
     superUse: 1,
+    dash: 0.35,
   },
 };
 
@@ -101,6 +106,7 @@ export class AIController implements Controller {
   private wantKick = false;
   private allowKick = true;
   private wantSuper = false;
+  private wantDash = 0;
   private sim = new Ball();
   private impacts = makeImpactLog();
   private path: PathPoint[] = [];
@@ -153,6 +159,8 @@ export class AIController implements Controller {
     if (out.kickPressed) this.kickCd = 0.25;
     out.superPressed = this.wantSuper && me.energy >= 1 && !me.charged;
     if (out.superPressed) this.wantSuper = false;
+    out.dash = this.wantDash;
+    this.wantDash = 0;
   }
 
   // ------------------------------------------------------------ prediction
@@ -248,6 +256,7 @@ export class AIController implements Controller {
     this.targetX = clamp(this.targetX + rand(-1, 1) * this.p.aimNoise, me.halfW, W - me.halfW);
 
     this.considerHeader(n);
+    this.considerDash();
 
     // Arm the super when the ball is about to be played (in front of me and close).
     if (me.energy >= 1 && !me.charged) {
@@ -261,6 +270,17 @@ export class AIController implements Controller {
       const rx = (b.x - me.x) * f;
       if (rx > 5 && rx < 80 && b.y > GROUND_Y - 110 && this.allowKick) this.wantKick = true;
     }
+  }
+
+  /** Dash when the ball got past me or a long way has to be covered quickly. */
+  private considerDash(): void {
+    const me = this.me;
+    if (me.dashCd > 0 || !me.grounded || this.match.phase !== 'playing') return;
+    const dx = this.targetX - me.x;
+    const far = Math.abs(dx) > (this.mode === 'attack' ? 300 : 200);
+    if (!far || Math.sign(me.vx) !== Math.sign(dx)) return;
+    const urgent = this.mode === 'recover' || this.mode === 'defend';
+    if (Math.random() < this.p.dash * (urgent ? 1.6 : 0.6)) this.wantDash = Math.sign(dx);
   }
 
   /** Time to raise the head by `h` px with a full jump (null if out of reach). */
@@ -296,7 +316,7 @@ export class AIController implements Controller {
     if (!this.allowKick || (this.match.phase !== 'playing' && this.match.phase !== 'goal')) return false;
     const lead = KICK_LEAD + (this.difficulty === 'medium' ? rand(-0.02, 0.025) : 0);
     const bx = b.x + b.vx * lead;
-    const by = b.y + b.vy * lead + 0.5 * 1350 * lead * lead;
+    const by = b.y + b.vy * lead + 0.5 * BALL_GRAVITY * lead * lead;
     const dx = bx - (me.hipX + me.facing * 19 + me.vx * lead);
     const dy = by - (me.hipY + 8);
     const reach = b.r + me.footR + 9;

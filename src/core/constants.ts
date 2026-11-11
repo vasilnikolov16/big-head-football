@@ -3,13 +3,20 @@
 export const W = 1280;
 export const H = 720;
 
+/**
+ * The visible area in world units. The pitch (0..W, 0..H) always fits; on a
+ * wider or taller screen the stadium simply continues past it (no black bars),
+ * so this rect can start at negative coordinates. Set by the renderer on resize.
+ */
+export const SCREEN = { x: 0, y: 0, w: W, h: H };
+
 // Pitch
 export const GROUND_Y = 630; // the line players stand on
 export const GRASS_TOP = 500; // far edge of the grass (visual only)
 
 // Goals (side view: the goal mouth is the strip between the wall and the goal line)
 export const GOAL_DEPTH = 96; // distance from the side wall to the goal line
-export const GOAL_HEIGHT = 222;
+export const GOAL_HEIGHT = 206;
 export const GOAL_TOP = GROUND_Y - GOAL_HEIGHT;
 export const BAR_THICK = 14;
 
@@ -19,7 +26,7 @@ export const DT = 1 / SIM_HZ;
 
 // Ball
 export const BALL_R = 21;
-export const BALL_GRAVITY = 1350;
+export const BALL_GRAVITY = 1650;
 export const MAX_BALL_SPEED = 1900;
 
 // Players

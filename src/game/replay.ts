@@ -30,6 +30,8 @@ interface PlayerSnap {
   charged: boolean;
   runPhase: number;
   blink: number;
+  dashT: number;
+  dashDir: number;
 }
 
 interface Snap {
@@ -70,6 +72,8 @@ const snapPlayer = (p: Player, out?: PlayerSnap): PlayerSnap => {
   s.charged = p.charged;
   s.runPhase = p.runPhase;
   s.blink = p.blink;
+  s.dashT = p.dashT;
+  s.dashDir = p.dashDir;
   return s;
 };
 
@@ -252,6 +256,8 @@ export class ReplayPlayer {
       g.charged = sb.charged;
       g.runPhase = lerp(sa.runPhase, sb.runPhase, k);
       g.blink = sb.blink;
+      g.dashT = sb.dashT;
+      g.dashDir = sb.dashDir;
     }
     if (v.arena.goalTop[0] !== b.goalTop[0]) v.arena.setGoalTop(0, b.goalTop[0]);
     if (v.arena.goalTop[1] !== b.goalTop[1]) v.arena.setGoalTop(1, b.goalTop[1]);

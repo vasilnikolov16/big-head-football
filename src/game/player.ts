@@ -18,6 +18,12 @@ const HIP_UP = 25;
 const BODY_UP = 40;
 const NECK_UP = 56;
 
+/** dash: burst duration, cooldown, speed multiplier */
+export const DASH_TIME = 0.2;
+export const DASH_COOLDOWN = 0.85;
+const DASH_SPEED = 2.15;
+const DASH_SPEED_AIR = 1.6;
+
 const COYOTE = 0.09;
 const JUMP_BUFFER = 0.13;
 
@@ -27,6 +33,7 @@ export interface PlayerMatchStats {
   headers: number;
   touches: number;
   jumps: number;
+  dashes: number;
 }
 
 export class Player {
@@ -73,6 +80,12 @@ export class Player {
   /** set by the match: no charging or arming outside open play (e.g. after a goal) */
   superLocked = false;
 
+  // dash
+  /** seconds left of the current dash (0 = not dashing) */
+  dashT = 0;
+  dashDir = 0;
+  dashCd = 0;
+
   // status effects
   stunT = 0;
   frozenT = 0;
@@ -92,7 +105,7 @@ export class Player {
   runPhase = 0;
   touchCooldown = 0;
 
-  stats: PlayerMatchStats = { kicks: 0, shots: 0, headers: 0, touches: 0, jumps: 0 };
+  stats: PlayerMatchStats = { kicks: 0, shots: 0, headers: 0, touches: 0, jumps: 0, dashes: 0 };
 
   constructor(index: 0 | 1, char: CharacterDef) {
     this.index = index;
@@ -157,6 +170,8 @@ export class Player {
     this.kickT = -1;
     this.jumpBuffer = 0;
     this.squash = 0;
+    this.dashT = 0;
+    this.dashCd = 0;
     this.updateFoot(0);
   }
 
@@ -202,13 +217,33 @@ export class Player {
     let move = frozen ? 0 : intent.move;
     if (this.reversedT > 0) move = -move;
 
+    // --- dash: double tap a direction for a short burst of speed ---
+    this.dashCd -= dt;
+    if (!frozen && intent.dash !== 0 && this.dashCd <= 0) {
+      const dir = this.reversedT > 0 ? -intent.dash : intent.dash;
+      this.dashDir = dir < 0 ? -1 : 1;
+      this.dashT = DASH_TIME;
+      this.dashCd = DASH_COOLDOWN;
+      this.vx = this.dashDir * this.maxSpeed * (this.grounded ? DASH_SPEED : DASH_SPEED_AIR);
+      this.stats.dashes++;
+      this.setExpression('effort', 0.3);
+      events.emit('dash', { player: this.index, x: this.x, y: this.y, dir: this.dashDir });
+    }
+    if (frozen) this.dashT = 0;
+
     // --- horizontal movement: snappy acceleration, quick turn-around ---
-    const target = move * this.maxSpeed;
-    let accel: number;
-    if (this.grounded) accel = move !== 0 ? 4300 : 3800;
-    else accel = move !== 0 ? 2700 : 700;
-    if (move !== 0 && Math.sign(this.vx) === -move) accel *= 1.7;
-    this.vx = approach(this.vx, target, accel * dt);
+    if (this.dashT > 0) {
+      this.dashT = Math.max(0, this.dashT - dt);
+    } else {
+      const target = move * this.maxSpeed;
+      let accel: number;
+      if (this.grounded) accel = move !== 0 ? 4300 : 3800;
+      else accel = move !== 0 ? 2700 : 700;
+      if (move !== 0 && Math.sign(this.vx) === -move) accel *= 1.7;
+      // coming out of a dash: bleed the extra speed off quickly but not instantly
+      if (Math.abs(this.vx) > this.maxSpeed * 1.05) accel = Math.max(accel, 5200);
+      this.vx = approach(this.vx, target, accel * dt);
+    }
 
     // --- jumping (with coyote time + input buffer + variable height) ---
     if (!frozen && intent.jumpPressed) this.jumpBuffer = JUMP_BUFFER;
@@ -291,9 +326,11 @@ export class Player {
     if (this.x - hw < 0) {
       this.x = hw;
       if (this.vx < 0) this.vx = 0;
+      this.dashT = 0;
     } else if (this.x + hw > W) {
       this.x = W - hw;
       if (this.vx > 0) this.vx = 0;
+      this.dashT = 0;
     }
 
     // Crossbars: players can stand on them and bonk their head underneath.

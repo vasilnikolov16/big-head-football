@@ -11,6 +11,8 @@ export type Sfx =
   | 'post'
   | 'jump'
   | 'land'
+  | 'dash'
+  | 'bump'
   | 'whistleStart'
   | 'whistleEnd'
   | 'whistleGolden'
@@ -286,6 +288,14 @@ export class AudioEngine {
         break;
       case 'jump':
         this.noiseHit(t, 0.12, 0.12, 'bandpass', 500, 1600, 1.5);
+        break;
+      case 'dash':
+        this.noiseHit(t, 0.16, 0.22 * k, 'bandpass', 900, 2600, 1.2);
+        break;
+      case 'bump':
+        this.tone('sine', 120, 55, t, 0.14, 0.7 * k);
+        this.noiseHit(t, 0.07, 0.3 * k, 'lowpass', 700);
+        this.tone('triangle', 660, 330, t + 0.02, 0.1, 0.12 * k);
         break;
       case 'land':
         this.tone('sine', 90, 50, t, 0.08, 0.3 * k);

@@ -1,7 +1,7 @@
 import { GROUND_Y, INK } from '../core/constants';
 import { clamp, lerp } from '../core/math';
 import type { Expression, FaceStyle } from '../game/characters';
-import type { Player } from '../game/player';
+import { DASH_TIME, type Player } from '../game/player';
 import { SUPER_INFO } from '../game/supers';
 import { HERO_ART, type HeadDraw } from './heroArt';
 
@@ -71,6 +71,26 @@ function lighten(hex: string): string {
   return `rgb(${r},${g},${b})`;
 }
 
+/** Speed lines behind a dashing player. */
+function drawDashLines(ctx: CanvasRenderingContext2D, p: Player, k: number): void {
+  const d = p.dashDir;
+  const top = -(p.height - 6);
+  ctx.save();
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 5; i++) {
+    const y = -12 + (top + 12) * (i / 4);
+    const len = (40 + ((i * 37) % 30)) * k;
+    const x0 = -d * (p.headR * 0.55 + 6 + (i % 2) * 8);
+    ctx.strokeStyle = `rgba(255,255,255,${0.55 * k})`;
+    ctx.lineWidth = 4 - (i % 2);
+    ctx.beginPath();
+    ctx.moveTo(x0, y);
+    ctx.lineTo(x0 - d * len, y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 /** Glow around a player whose super shot is armed. */
 function drawAura(ctx: CanvasRenderingContext2D, p: Player, t: number): void {
   const color = SUPER_INFO[p.char.super].color;
@@ -123,8 +143,12 @@ export function drawPlayer(ctx: CanvasRenderingContext2D, p: Player, alpha: numb
   ctx.save();
   ctx.translate(x, y);
   if (p.charged) drawAura(ctx, p, t);
+  const dash = p.dashT > 0 ? p.dashT / DASH_TIME : 0;
+  if (dash > 0) drawDashLines(ctx, p, dash);
   // squash & stretch around the feet
   ctx.scale(1 + s * 0.45, 1 - s * 0.45);
+  // lean into the dash
+  if (dash > 0) ctx.transform(1, 0, p.dashDir * -0.22 * dash, 1, 0, 0);
 
   if (art.bodyBack) {
     ctx.save();

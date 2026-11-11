@@ -13,10 +13,10 @@ import { circleRect, makeContact, type Contact } from './collide';
 /** Moment of inertia factor for a hollow sphere: I = k·m·r² */
 const INERTIA_K = 2 / 3;
 const MAGNUS = 0.0032;
-const AIR_DRAG_LINEAR = 0.1; // 1/s
-const AIR_DRAG_QUAD = 0.00011; // 1/px
-const ROLL_RESIST = 0.8; // 1/s, damping while rolling on the ground
-const ROLL_DECEL = 55; // px/s², constant rolling friction on grass
+const AIR_DRAG_LINEAR = 0.2; // 1/s
+const AIR_DRAG_QUAD = 0.00014; // 1/px
+const ROLL_RESIST = 1.3; // 1/s, damping while rolling on the ground
+const ROLL_DECEL = 150; // px/s², constant rolling friction on grass
 
 export class Ball {
   x = W / 2;
@@ -118,7 +118,7 @@ export function collideBallWorld(b: Ball, arena: Arena, impacts: ImpactLog, h: n
     tmp.nx = 0;
     tmp.ny = -1;
     tmp.pen = b.y + r - GROUND_Y;
-    const s = resolveBallContact(b, tmp, 0.64, 0.55);
+    const s = resolveBallContact(b, tmp, 0.48, 0.55);
     impacts.ground = Math.max(impacts.ground, s);
     b.grounded = true;
   }
@@ -127,25 +127,25 @@ export function collideBallWorld(b: Ball, arena: Arena, impacts: ImpactLog, h: n
     tmp.nx = 0;
     tmp.ny = 1;
     tmp.pen = r - b.y;
-    impacts.ceiling = Math.max(impacts.ceiling, resolveBallContact(b, tmp, 0.6, 0.3));
+    impacts.ceiling = Math.max(impacts.ceiling, resolveBallContact(b, tmp, 0.5, 0.3));
   }
   // Side walls (also the back of each goal)
   if (b.x - r < 0) {
     tmp.nx = 1;
     tmp.ny = 0;
     tmp.pen = r - b.x;
-    impacts.wall = Math.max(impacts.wall, resolveBallContact(b, tmp, 0.68, 0.3));
+    impacts.wall = Math.max(impacts.wall, resolveBallContact(b, tmp, 0.56, 0.3));
   } else if (b.x + r > W) {
     tmp.nx = -1;
     tmp.ny = 0;
     tmp.pen = b.x + r - W;
-    impacts.wall = Math.max(impacts.wall, resolveBallContact(b, tmp, 0.68, 0.3));
+    impacts.wall = Math.max(impacts.wall, resolveBallContact(b, tmp, 0.56, 0.3));
   }
   // Crossbars
   for (let i = 0; i < 2; i++) {
     const bar = arena.bars[i];
     if (!circleRect(b.x, b.y, r, bar, tmp)) continue;
-    impacts.bar = Math.max(impacts.bar, resolveBallContact(b, tmp, 0.72, 0.35));
+    impacts.bar = Math.max(impacts.bar, resolveBallContact(b, tmp, 0.6, 0.35));
     // A ball resting on top of the crossbar slides back into play.
     if (tmp.ny < -0.7) {
       const towardField = i === 0 ? 1 : -1;

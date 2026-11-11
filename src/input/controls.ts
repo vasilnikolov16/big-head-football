@@ -98,6 +98,8 @@ export interface PlayerIntent {
   jumpPressed: boolean;
   kickPressed: boolean;
   superPressed: boolean;
+  /** dash this step: -1 left, 1 right, 0 none (double tap of a direction) */
+  dash: number;
 }
 
 export const emptyIntent = (): PlayerIntent => ({
@@ -106,13 +108,47 @@ export const emptyIntent = (): PlayerIntent => ({
   jumpPressed: false,
   kickPressed: false,
   superPressed: false,
+  dash: 0,
 });
+
+/** Max time between the two taps of a direction for a dash. */
+export const DOUBLE_TAP_MS = 260;
+
+/** Turns presses of left/right into a dash when the same direction is tapped twice quickly. */
+export class DoubleTap {
+  private last: [number, number] = [-1e9, -1e9];
+  private queued = 0;
+
+  /** a new press of a direction (-1 left / 1 right) at time now (ms) */
+  press(dir: number, now: number): void {
+    const i = dir < 0 ? 0 : 1;
+    if (now - this.last[i] <= DOUBLE_TAP_MS) {
+      this.queued = dir;
+      this.last[i] = -1e9; // a third tap starts a new pair
+    } else this.last[i] = now;
+    this.last[1 - i] = -1e9;
+  }
+
+  take(): number {
+    const d = this.queued;
+    this.queued = 0;
+    return d;
+  }
+
+  clear(): void {
+    this.queued = 0;
+    this.last = [-1e9, -1e9];
+  }
+}
 
 export interface Controller {
   read(out: PlayerIntent): void;
 }
 
 export class KeyboardController implements Controller {
+  private taps = new DoubleTap();
+  private seen: [number, number] = [0, 0];
+
   constructor(
     private kb: Keyboard,
     /** live reference: rebinding in the settings applies immediately */
@@ -129,6 +165,13 @@ export class KeyboardController implements Controller {
     out.jumpPressed = this.kb.consume(b.jump);
     out.kickPressed = this.kb.consume(b.kick);
     out.superPressed = this.kb.consume(b.super);
+    // a new press of a direction key has a higher order number than the last one seen
+    const now = performance.now();
+    if (l > this.seen[0]) this.taps.press(-1, now);
+    if (r > this.seen[1]) this.taps.press(1, now);
+    this.seen[0] = Math.max(this.seen[0], l);
+    this.seen[1] = Math.max(this.seen[1], r);
+    out.dash = this.taps.take();
   }
 }
 

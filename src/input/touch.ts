@@ -1,11 +1,13 @@
-import type { Controller, PlayerIntent } from './controls';
+import { t } from '../i18n/i18n';
+import { DoubleTap, emptyIntent, type Controller, type PlayerIntent } from './controls';
 
 type Btn = 'left' | 'right' | 'jump' | 'kick' | 'super';
 
 /**
- * On-screen buttons for phones/tablets, laid out like the classic mobile
- * big-head football games: ◀ ▶ bottom-left, jump / kick / super bottom-right.
- * Multi-touch: every finger is tracked, and sliding a thumb from ◀ to ▶ works.
+ * On-screen buttons for phones/tablets: ◀ ▶ bottom-left, and a row of
+ * super / kick / jump bottom-right (jump on the outside, under the thumb).
+ * Multi-touch: every finger is tracked, a thumb can slide from button to
+ * button, and a quick double tap on ◀ or ▶ dashes.
  */
 export class TouchControls implements Controller {
   readonly root: HTMLElement;
@@ -14,6 +16,7 @@ export class TouchControls implements Controller {
   private pressed = new Set<Btn>();
   private fingers = new Map<number, Btn | null>();
   private seq = 0;
+  private taps = new DoubleTap();
   private visible = true;
   onPause: () => void = () => {};
   /** online: an emote was picked from the emote row */
@@ -27,19 +30,20 @@ export class TouchControls implements Controller {
     const root = document.createElement('div');
     root.className = 'touch-pad';
     this.root = root;
-    const make = (b: Btn, label: string): void => {
+    const make = (b: Btn, icon: string, label?: string): void => {
       const el = document.createElement('div');
       el.className = `tbtn tb-${b}`;
       el.dataset.btn = b;
-      el.innerHTML = `<span>${label}</span>`;
+      el.innerHTML = `<span class="tb-icon">${icon}</span>` + (label ? `<span class="tb-label" data-k="${label}"></span>` : '');
       root.append(el);
       this.els.set(b, el);
     };
     make('left', '◀');
     make('right', '▶');
-    make('jump', '⬆');
-    make('kick', '👟');
-    make('super', '⚡');
+    make('super', '⚡', 'act.superShort');
+    make('kick', '👟', 'act.kick');
+    make('jump', '⬆', 'act.jump');
+    this.relabel();
     const pause = document.createElement('div');
     pause.className = 'tbtn tb-pause';
     pause.innerHTML = '<span>❚❚</span>';
@@ -88,6 +92,11 @@ export class TouchControls implements Controller {
     this.setVisible(false);
   }
 
+  /** button captions in the current language */
+  relabel(): void {
+    for (const el of this.root.querySelectorAll<HTMLElement>('.tb-label')) el.textContent = t(el.dataset.k ?? '');
+  }
+
   private btnAt(x: number, y: number): Btn | null {
     const el = document.elementFromPoint(x, y) as HTMLElement | null;
     const b = el?.closest<HTMLElement>('.tbtn')?.dataset.btn as Btn | undefined;
@@ -96,7 +105,10 @@ export class TouchControls implements Controller {
 
   private press(b: Btn | null): void {
     if (!b) return;
-    if (!this.held.has(b)) this.pressed.add(b);
+    if (!this.held.has(b)) {
+      this.pressed.add(b);
+      if (b === 'left' || b === 'right') this.taps.press(b === 'left' ? -1 : 1, performance.now());
+    }
     this.held.set(b, ++this.seq);
     this.els.get(b)!.classList.add('down');
   }
@@ -132,8 +144,8 @@ export class TouchControls implements Controller {
     e.preventDefault();
     const was = this.fingers.get(e.pointerId) ?? null;
     const now = this.btnAt(e.clientX, e.clientY);
-    // only the move buttons follow a sliding thumb
-    if (now !== was && (now === 'left' || now === 'right' || was === 'left' || was === 'right')) {
+    // a sliding thumb moves from button to button (rolling from kick onto jump presses jump)
+    if (now !== was && now !== null) {
       this.fingers.set(e.pointerId, now);
       this.release(was);
       this.press(now);
@@ -164,6 +176,7 @@ export class TouchControls implements Controller {
     this.held.clear();
     this.pressed.clear();
     this.fingers.clear();
+    this.taps.clear();
     for (const el of this.els.values()) el.classList.remove('down');
   }
 
@@ -175,18 +188,22 @@ export class TouchControls implements Controller {
     out.jumpPressed = this.pressed.delete('jump');
     out.kickPressed = this.pressed.delete('kick');
     out.superPressed = this.pressed.delete('super');
+    this.pressed.delete('left');
+    this.pressed.delete('right');
+    out.dash = this.taps.take();
   }
 }
 
 /** Merges several controllers (keyboard + touch for the same player). */
 export class MultiController implements Controller {
-  private tmp: PlayerIntent = { move: 0, jumpHeld: false, jumpPressed: false, kickPressed: false, superPressed: false };
+  private tmp: PlayerIntent = emptyIntent();
 
   constructor(private list: Controller[]) {}
 
   read(out: PlayerIntent): void {
     out.move = 0;
     out.jumpHeld = out.jumpPressed = out.kickPressed = out.superPressed = false;
+    out.dash = 0;
     for (const c of this.list) {
       c.read(this.tmp);
       if (this.tmp.move !== 0) out.move = this.tmp.move;
@@ -194,6 +211,7 @@ export class MultiController implements Controller {
       out.jumpPressed ||= this.tmp.jumpPressed;
       out.kickPressed ||= this.tmp.kickPressed;
       out.superPressed ||= this.tmp.superPressed;
+      if (this.tmp.dash) out.dash = this.tmp.dash;
     }
   }
 }

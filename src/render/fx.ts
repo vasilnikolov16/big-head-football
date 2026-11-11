@@ -89,6 +89,14 @@ export class Fx {
         this.particles.dust(e.x, Math.min(1, e.force / 1500));
       }),
       ev.on('jump', (e) => this.particles.dust(e.x, 0.3)),
+      ev.on('dash', (e) => {
+        if (e.y > GROUND_Y - 4) this.particles.dashPuff(e.x, e.dir);
+      }),
+      ev.on('bump', (e) => {
+        this.addShake(5);
+        this.particles.stars(e.x, e.y, 6, '#ffe14d');
+        this.particles.sparks(e.x, e.y, 8, '#ffffff', 380);
+      }),
       ev.on('superShot', (e) => {
         const color = SUPER_INFO[e.id as keyof typeof SUPER_INFO]?.color ?? '#ffffff';
         this.addShake(12);

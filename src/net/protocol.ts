@@ -3,7 +3,7 @@ import type { PlayerMatchStats } from '../game/player';
 import type { MatchSummary } from '../game/tracker';
 
 /** Bump when the messages change: players on different versions can't play together. */
-export const PROTOCOL = 1;
+export const PROTOCOL = 2;
 /** Public signalling ids are global: prefix them so we never collide with other apps. */
 export const ROOM_PREFIX = 'kratunball-r1-';
 /** No I, O, 0, 1: nothing that can be misread when a code is dictated. */
@@ -23,6 +23,8 @@ export const EVENT_NAMES = [
   'touch',
   'jump',
   'land',
+  'dash',
+  'bump',
   'bounce',
   'goal',
   'whistle',
@@ -64,6 +66,8 @@ export type PlayerPack = [
   energy: number,
   reversedT: number,
   jumpBoostT: number,
+  dashT: number,
+  dashDir: number,
 ];
 
 /** Everything the guest needs to draw one moment of the match. */
@@ -111,8 +115,8 @@ export interface GuestInput {
   n: number;
   m: number;
   j: 0 | 1;
-  /** cumulative presses: jump, kick, super */
-  c: [number, number, number];
+  /** cumulative presses: jump, kick, super, dash left, dash right */
+  c: [number, number, number, number, number];
 }
 
 export interface MatchEnd {

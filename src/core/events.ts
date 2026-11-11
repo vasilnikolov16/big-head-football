@@ -32,6 +32,10 @@ export type GameEvents = {
   header: { player: number; x: number; y: number; speed: number };
   touch: { player: number };
   jump: { player: number; x: number; y: number };
+  /** quick burst of speed (double tap left/right) */
+  dash: { player: number; x: number; y: number; dir: number };
+  /** a dashing player crashed into the other one */
+  bump: { player: number; x: number; y: number; force: number };
   land: { player: number; x: number; y: number; force: number };
   bounce: { surface: Surface; x: number; y: number; speed: number };
   goal: { scorer: number; x: number; y: number; golden: boolean };

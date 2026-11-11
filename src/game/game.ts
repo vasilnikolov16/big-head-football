@@ -4,7 +4,7 @@ import { GameAudio } from '../audio/gameAudio';
 import { Music } from '../audio/music';
 import { DT } from '../core/constants';
 import { loadSettings, saveSettings, type Settings } from '../core/storage';
-import { setLang, t, tr } from '../i18n/i18n';
+import { setLang, t, tr, onLangChange } from '../i18n/i18n';
 import { KeyboardController, menuKeys, type Controller } from '../input/controls';
 import { Keyboard } from '../input/keyboard';
 import { MultiController, TouchControls } from '../input/touch';
@@ -75,6 +75,7 @@ export class Game implements AppActions {
     this.touch.onPause = () => this.onKey('Escape');
     this.touch.onFirstTouch = () => this.onFirstTouch();
     this.touch.onEmote = (i) => this.online.emote(i);
+    onLangChange(() => this.touch.relabel());
     this.ui = new UI(uiHost);
     this.toaster = new Toaster(uiHost, () => this.audio.play('powerPick', 0.8));
     this.ui.onSound = (snd) => this.audio.play(snd === 'move' ? 'uiMove' : snd === 'select' ? 'uiSelect' : 'uiBack');
@@ -189,6 +190,7 @@ export class Game implements AppActions {
         if (this.ui.active) {
           out.move = 0;
           out.jumpHeld = out.jumpPressed = out.kickPressed = out.superPressed = false;
+          out.dash = 0;
         }
       },
     };

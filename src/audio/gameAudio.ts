@@ -25,6 +25,10 @@ export class GameAudio {
       ev.on('jump', () => {
         if (!quiet) a.play('jump', 0.6);
       }),
+      ev.on('dash', () => {
+        if (!quiet) a.play('dash', 0.8);
+      }),
+      ev.on('bump', (e) => a.play('bump', (0.5 + e.force / 1600) * v)),
       ev.on('land', (e) => {
         if (!quiet && e.force > 500) a.play('land', e.force / 1600);
       }),

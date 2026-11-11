@@ -100,6 +100,7 @@ const S: Record<string, [string, string]> = {
   'act.jump': ['Скок', 'Jump'],
   'act.kick': ['Ритник', 'Kick'],
   'act.super': ['Супер удар', 'Super shot'],
+  'act.superShort': ['Супер', 'Super'],
   'controls.p1': ['Играч 1 · ляв', 'Player 1 · left'],
   'controls.p2': ['Играч 2 · десен', 'Player 2 · right'],
   'controls.help': [
@@ -121,6 +122,7 @@ const S: Record<string, [string, string]> = {
   'howto.jump': ['скок (задръж = по-високо)', 'jump (hold = higher)'],
   'howto.kick': ['ритник', 'kick'],
   'howto.super': ['супер удар', 'super shot'],
+  'howto.dash': ['даш (бързо 2 пъти в една посока)', 'dash (tap a direction twice quickly)'],
   'howto.tip1': [
     'Ритникът е най-силен, ако го натиснеш малко преди топката да стигне до крака. Късният ритник праща топката високо.',
     'Kicks are strongest if you press just before the ball reaches your foot. A late kick lobs the ball high.',
@@ -141,8 +143,8 @@ const S: Record<string, [string, string]> = {
   ],
   'howto.touchTitle': ['На телефон / таблет', 'On phone / tablet'],
   'howto.touch': [
-    '◀ ▶ долу вляво — движение. Вдясно: ⬆ скок, 👟 ритник, ⚡ супер удар (светва при пълна лента). ❚❚ — пауза.',
-    '◀ ▶ bottom left — move. On the right: ⬆ jump, 👟 kick, ⚡ super shot (lights up when the bar is full). ❚❚ — pause.',
+    '◀ ▶ долу вляво — движение, бързо докосни два пъти за даш. Вдясно: ⚡ супер (светва при пълна лента), 👟 ритник, ⬆ скок. ❚❚ — пауза.',
+    '◀ ▶ bottom left — move, tap twice quickly to dash. On the right: ⚡ super (lights up when the bar is full), 👟 kick, ⬆ jump. ❚❚ — pause.',
   ],
   'howto.ok': ['Разбрах!', 'Got it!'],
 
@@ -337,6 +339,18 @@ const S: Record<string, [string, string]> = {
   'buf.normal': ['Нормално', 'Normal'],
   'buf.smooth': ['Гладко', 'Smooth'],
   'stats.online': ['Онлайн мачове (П/З)', 'Online matches (W/L)'],
+  'menu.installIos': [
+    '📲 На цял екран като приложение: Сподели ⬆ → „Добави към началния екран“',
+    '📲 Full screen, like an app: Share ⬆ → “Add to Home Screen”',
+  ],
+  'menu.installAndroid': [
+    '📲 На цял екран като приложение: менюто ⋮ на браузъра → „Инсталирай приложението“',
+    '📲 Full screen, like an app: browser menu ⋮ → “Install app”',
+  ],
+  'howto.tip8': [
+    'Дашът (2 бързи натискания наляво или надясно) те изстрелва напред: стига се топка, която ти е избягала, а ако се засилиш в противника — събаряш го за миг. После трябва малко време, преди да можеш пак.',
+    'Dash (tap left or right twice quickly) shoots you forward: catch a ball that got away, or charge into your opponent to knock them over for a moment. It needs a short rest before the next one.',
+  ],
   'howto.tip7': [
     'Онлайн игра: единият създава стая, другият влиза с кода (или с линка). По време на мача 1 2 3 4 пращат емотикони.',
     'Online: one player creates a room, the other joins with the code (or the link). During the match 1 2 3 4 send emotes.',

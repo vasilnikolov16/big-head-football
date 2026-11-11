@@ -72,6 +72,13 @@ export class Particles {
     }
   }
 
+  /** a burst of dust behind a dashing player */
+  dashPuff(x: number, dir: number): void {
+    for (let i = 0; i < 7; i++) {
+      this.spawn(Kind.Dust, x - dir * rand(4, 22), GROUND_Y - rand(2, 12), -dir * rand(90, 260), rand(-70, -10), rand(0.3, 0.55), rand(7, 12), 'rgba(225,235,200,', -40);
+    }
+  }
+
   sparks(x: number, y: number, n: number, color: string, speed = 520): void {
     for (let i = 0; i < n; i++) {
       const a = rand(0, Math.PI * 2);

@@ -1,4 +1,4 @@
-import { FONT_DISPLAY, H, INK, W } from '../core/constants';
+import { FONT_DISPLAY, H, INK, W, SCREEN } from '../core/constants';
 import { clamp, easeOutBack, easeOutCubic } from '../core/math';
 import type { CharacterDef } from '../game/characters';
 import { Player } from '../game/player';
@@ -80,7 +80,7 @@ export class SuperCinematic {
     g.addColorStop(0.35, `rgba(5,4,20,${0.35 * fade})`);
     g.addColorStop(1, `rgba(5,4,20,${0.78 * fade})`);
     ctx.fillStyle = g;
-    ctx.fillRect(-100, -100, W + 200, H + 200);
+    ctx.fillRect(SCREEN.x - 100, SCREEN.y - 100, SCREEN.w + 200, SCREEN.h + 200);
     // radial speed lines in the hero's colour
     ctx.globalCompositeOperation = 'lighter';
     const n = 34;
@@ -120,7 +120,7 @@ export class SuperCinematic {
     // white flash
     if (t < 0.14) {
       ctx.fillStyle = `rgba(255,255,255,${0.75 * (1 - t / 0.14)})`;
-      ctx.fillRect(0, 0, W, H);
+      ctx.fillRect(SCREEN.x, SCREEN.y, SCREEN.w, SCREEN.h);
     }
     const dir = s.side === 0 ? 1 : -1;
     // banner slides in from the shooter's side, holds, slides out the other way
