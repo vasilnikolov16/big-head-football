@@ -1,4 +1,7 @@
 import { AIController, type Difficulty } from '../ai/aiController';
+import { AudioEngine } from '../audio/audio';
+import { GameAudio } from '../audio/gameAudio';
+import { Music } from '../audio/music';
 import { DT } from '../core/constants';
 import { loadSettings, saveSettings, type Settings } from '../core/storage';
 import { KeyboardController, menuKeys } from '../input/controls';
@@ -19,9 +22,14 @@ import { heroSelect } from '../ui/heroSelect';
 import { UI } from '../ui/ui';
 import { CHARACTERS, type CharacterDef } from './characters';
 import { Match } from './match';
+import { Recorder, ReplayPlayer } from './replay';
 
 const MAX_FRAME = 0.1; // never simulate more than 100 ms per frame (tab switches etc.)
 const POST_MATCH_DELAY = 1.6;
+/** seconds of live celebration before the replay starts */
+const REPLAY_DELAY = 1.5;
+/** frames recorded after the ball crossed the line */
+const REPLAY_AFTER = 50;
 
 const DIFF_LABEL: Record<Difficulty, string> = { easy: 'CPU · лесно', medium: 'CPU · средно', hard: 'CPU · трудно' };
 
@@ -49,10 +57,20 @@ export class Game implements AppActions {
   private last = 0;
   private t = 0;
   private postShown = false;
+  readonly audio = new AudioEngine();
+  private music = new Music(this.audio);
+  private gameAudio = new GameAudio(this.audio);
+  private recorder = new Recorder();
+  private replay: ReplayPlayer | null = null;
+  /** match time at which the goal replay should start, or -1 */
+  private replayAt = -1;
 
   constructor(canvas: HTMLCanvasElement, uiHost: HTMLElement) {
     this.renderer = new Renderer(canvas, uiHost);
     this.ui = new UI(uiHost);
+    this.ui.onSound = (snd) => this.audio.play(snd === 'move' ? 'uiMove' : snd === 'select' ? 'uiSelect' : 'uiBack');
+    this.audio.onReady = () => this.music.start();
+    this.music.setMood('menu');
     this.kb.onPress((code) => this.onKey(code));
     this.onSettingsChanged();
     this.startDemo();
@@ -68,7 +86,13 @@ export class Game implements AppActions {
     if (setup.mode === 'cpu') tags = ['ТИ', DIFF_LABEL[setup.difficulty]];
     else if (setup.mode === 'pvp') tags = ['P1', 'P2'];
     else tags = ['CPU', 'CPU'];
-    const m = new Match({ chars: setup.chars, names, tags, duration: setup.duration });
+    const m = new Match({
+      chars: setup.chars,
+      names,
+      tags,
+      duration: setup.duration,
+      powerups: setup.mode === 'demo' ? true : this.settings.powerups,
+    });
     if (setup.mode === 'pvp') {
       m.controllers[0] = new KeyboardController(this.kb, this.settings.controls.p1);
       m.controllers[1] = new KeyboardController(this.kb, this.settings.controls.p2);
@@ -82,6 +106,14 @@ export class Game implements AppActions {
     }
     this.match = m;
     this.renderer.fx.attach(m);
+    this.gameAudio.attach(m, setup.mode === 'demo');
+    this.recorder.clear();
+    this.replay = null;
+    this.replayAt = -1;
+    m.events.on('goal', () => {
+      if (setup.mode !== 'demo' && this.settings.replays) this.replayAt = m.time + REPLAY_DELAY;
+    });
+    this.music.setMood(setup.mode === 'demo' ? 'menu' : 'match');
     this.acc = 0;
     this.paused = false;
     this.postShown = false;
@@ -132,6 +164,11 @@ export class Game implements AppActions {
   onSettingsChanged(): void {
     const c = this.settings.controls;
     this.kb.setGameKeys([...Object.values(c.p1).flat(), ...Object.values(c.p2).flat()]);
+    this.audio.setVolumes(this.settings.sfxVolume, this.settings.musicVolume);
+    if (this.match && this.setup.mode !== 'demo') {
+      this.match.powerups.enabled = this.settings.powerups;
+      if (!this.settings.powerups) this.match.powerups.endAll(this.match);
+    }
   }
 
   showSettings(back: () => void): void {
@@ -197,6 +234,7 @@ export class Game implements AppActions {
 
   quitToMenu(): void {
     this.paused = false;
+    this.replay = null;
     this.startDemo();
     this.showMain();
   }
@@ -210,6 +248,11 @@ export class Game implements AppActions {
     }
     if (this.ui.active) {
       this.ui.handleKey(code);
+      return;
+    }
+    // any key skips the slow-motion replay
+    if (this.replay && this.replay.t > 0.4) {
+      this.replay.done = true;
       return;
     }
     if (this.setup.mode !== 'demo' && this.match.phase !== 'ended' && (code === 'Escape' || code === 'KeyP')) {
@@ -229,17 +272,42 @@ export class Game implements AppActions {
     // rAF timestamps can be slightly older than performance.now() -> clamp at 0
     const dtReal = Math.max(0, Math.min(MAX_FRAME, (now - this.last) / 1000));
     this.last = now;
+    const fx = this.renderer.fx;
     if (!this.paused) {
       this.t += dtReal;
-      this.acc += dtReal * this.timeScale;
-      while (this.acc >= DT) {
-        this.match.step(DT);
-        this.acc -= DT;
+      if (this.replay) {
+        this.replay.update(dtReal);
+        if (this.replay.done) {
+          this.replay = null;
+          this.kb.flushPresses();
+        }
+      } else if (fx.hitStop > 0) {
+        // hit-stop: freeze the simulation for a few frames on big impacts
+        fx.hitStop = Math.max(0, fx.hitStop - dtReal);
+      } else {
+        this.acc += dtReal * this.timeScale;
+        while (this.acc >= DT) {
+          this.match.step(DT);
+          this.recorder.record(this.match);
+          this.acc -= DT;
+          if (this.replayAt >= 0 && this.match.time >= this.replayAt) {
+            this.replayAt = -1;
+            this.replay = new ReplayPlayer(this.recorder.take(), this.match, REPLAY_AFTER);
+            this.acc = 0;
+            break;
+          }
+        }
       }
       this.renderer.update(dtReal);
-      this.checkMatchOver();
+      this.audio.setCrowd(this.renderer.stadium.excitement);
+      if (!this.replay) this.checkMatchOver();
     }
-    this.renderer.render(this.match, this.acc / DT, this.t, { hud: this.setup.mode !== 'demo' });
+    if (this.replay) {
+      const v = this.replay.view;
+      this.renderer.render(v, 1, this.t, { hud: true, replayT: this.replay.t, replayGlow: v.superColor });
+    } else {
+      this.renderer.render(this.match, this.acc / DT, this.t, { hud: this.setup.mode !== 'demo' });
+    }
     requestAnimationFrame(this.frame);
   };
 

@@ -1,6 +1,6 @@
 import { FONT_DISPLAY, GROUND_Y, INK } from '../core/constants';
 import { clamp, easeOutBack, lerp } from '../core/math';
-import type { Match } from '../game/match';
+import type { RenderView } from './view';
 import { SUPER_INFO, type SuperShot } from '../game/supers';
 import { drawBall } from './ballDraw';
 
@@ -21,7 +21,7 @@ export class SuperFx {
   private warpTo: TrailPt | null = null;
   private warpT = 0;
 
-  update(m: Match, dt: number, bx: number, by: number): void {
+  update(m: RenderView, dt: number, bx: number, by: number): void {
     const s = m.superShot;
     if (s !== this.shot) {
       this.shot = s;
@@ -206,7 +206,7 @@ export class SuperFx {
   }
 
   /** Scale of the real ball (shrinks into the teleport). */
-  ballScale(m: Match): number {
+  ballScale(m: RenderView): number {
     const s = m.superShot;
     if (s?.id === 'warp' && s.phase === 0) return clamp(1 - s.t / 0.22, 0.05, 1);
     if (s?.id === 'warp' && s.phase === 2) return clamp((s.t - 0.55) / 0.15, 0.1, 1);
@@ -214,7 +214,7 @@ export class SuperFx {
   }
 
   /** On top of the ball. */
-  drawFront(ctx: CanvasRenderingContext2D, m: Match, bx: number, by: number, r: number, t: number): void {
+  drawFront(ctx: CanvasRenderingContext2D, m: RenderView, bx: number, by: number, r: number, t: number): void {
     const s = m.superShot;
     if (s && !s.hidden) {
       const color = SUPER_INFO[s.id].color;
@@ -283,7 +283,7 @@ export class SuperFx {
     }
   }
 
-  drawDecoys(ctx: CanvasRenderingContext2D, m: Match, alpha: number): void {
+  drawDecoys(ctx: CanvasRenderingContext2D, m: RenderView, alpha: number): void {
     for (const d of m.decoys) {
       const x = lerp(d.px, d.x, alpha);
       const y = lerp(d.py, d.y, alpha);
@@ -301,7 +301,7 @@ export class SuperFx {
     }
   }
 
-  drawCallout(ctx: CanvasRenderingContext2D, m: Match): void {
+  drawCallout(ctx: CanvasRenderingContext2D, m: RenderView): void {
     const c = m.callout;
     if (!c) return;
     const p = m.players[c.player];

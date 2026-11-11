@@ -1,24 +1,29 @@
-import { FONT_TEXT, H, W } from '../core/constants';
+import { FONT_DISPLAY, FONT_TEXT, H, INK, W } from '../core/constants';
 import { lerp } from '../core/math';
-import type { Match } from '../game/match';
 import { drawBall, drawBallShadow } from './ballDraw';
 import { Fx } from './fx';
 import { drawCrossbar, drawGoalBack } from './goals';
 import { drawBanner, drawHud } from './hud';
 import { drawPlayer, drawPlayerShadow } from './playerDraw';
+import { drawPowerItems } from './powerDraw';
 import { Stadium } from './stadium';
 import { SuperFx } from './superFx';
+import type { RenderView } from './view';
 
 export interface RenderOptions {
   /** scoreboard + banners (hidden for the menu background match) */
   hud: boolean;
+  /** seconds into a slow-motion replay, or null */
+  replayT?: number | null;
+  /** replay data: super glow colour of the current frame */
+  replayGlow?: string | null;
 }
 
 export class Renderer {
   readonly canvas: HTMLCanvasElement;
   readonly ctx: CanvasRenderingContext2D;
   readonly stadium = new Stadium();
-  readonly fx = new Fx();
+  readonly fx = new Fx(this.stadium);
   readonly superFx = new SuperFx();
   private lastDt = 0;
   scale = 1;
@@ -78,9 +83,10 @@ export class Renderer {
     return this.fps;
   }
 
-  render(m: Match, alpha: number, t: number, opts: RenderOptions): void {
+  render(m: RenderView, alpha: number, t: number, opts: RenderOptions): void {
     const ctx = this.ctx;
     const fx = this.fx;
+    const replay = opts.replayT != null;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#05060f';
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
@@ -106,27 +112,43 @@ export class Renderer {
 
     const sfx = this.superFx;
     sfx.update(m, this.lastDt, bx, by);
-    this.lastDt = 0;
-    const hidden = m.superShot?.hidden ?? false;
+    const hidden = (m.superShot?.hidden ?? false) || (b as { hiddenInReplay?: boolean }).hiddenInReplay === true;
     const br = b.r * sfx.ballScale(m);
+    fx.trackBall(bx, by, Math.hypot(b.vx, b.vy) || (replay ? this.replaySpeed(bx, by) : 0), !hidden);
+    this.lastDt = 0;
 
     drawPlayerShadow(ctx, m.players[0], alpha);
     drawPlayerShadow(ctx, m.players[1], alpha);
     if (!hidden) drawBallShadow(ctx, bx, by, br);
 
+    drawPowerItems(ctx, m.powerups.items, alpha, t);
     drawPlayer(ctx, m.players[0], alpha, t);
     drawPlayer(ctx, m.players[1], alpha, t);
+
+    const fire = b.fireT > 0;
+    const glow = opts.replayGlow ?? null;
+    fx.drawTrail(ctx, br, fire ? '#ff7a1f' : glow ?? '#ffffff');
     sfx.drawBack(ctx, t);
     sfx.drawDecoys(ctx, m, alpha);
-    if (!hidden) drawBall(ctx, bx, by, br, ba);
+    if (!hidden) {
+      if (fire) this.drawFireAura(ctx, bx, by, br, t);
+      if (glow) this.drawGlow(ctx, bx, by, br, glow);
+      drawBall(ctx, bx, by, br, ba);
+    }
     sfx.drawFront(ctx, m, bx, by, br, t);
+    fx.particles.draw(ctx);
 
     drawCrossbar(ctx, 0, m.arena, fx.barFlash[0]);
     drawCrossbar(ctx, 1, m.arena, fx.barFlash[1]);
 
     // HUD does not shake
     ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0);
-    if (opts.hud) {
+    if (fx.flash > 0) {
+      ctx.fillStyle = `rgba(255,255,240,${fx.flash * 0.55})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+    if (replay) this.drawReplayOverlay(ctx, opts.replayT ?? 0);
+    else if (opts.hud) {
       sfx.drawCallout(ctx, m);
       drawHud(ctx, m, t);
       if (m.banner) drawBanner(ctx, m.banner);
@@ -139,5 +161,83 @@ export class Renderer {
       ctx.fillStyle = this.fps >= 58 ? '#7cff6b' : '#ff6b6b';
       ctx.fillText(`${this.fps.toFixed(0)} FPS`, 10, H - 24);
     }
+  }
+
+  private lastReplayPos: { x: number; y: number } | null = null;
+  /** speed estimate from positions (replay frames carry no velocity) */
+  private replaySpeed(x: number, y: number): number {
+    const l = this.lastReplayPos;
+    this.lastReplayPos = { x, y };
+    if (!l) return 0;
+    return Math.hypot(x - l.x, y - l.y) * 120;
+  }
+
+  private drawFireAura(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, t: number): void {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(x, y, r * 0.5, x, y, r * 2.4);
+    g.addColorStop(0, 'rgba(255,170,40,0.85)');
+    g.addColorStop(1, 'rgba(255,60,0,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 2.4, 0, Math.PI * 2);
+    ctx.fill();
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * Math.PI * 2 + t * 6;
+      const len = r * (1.2 + 0.5 * Math.sin(t * 25 + i * 2));
+      ctx.fillStyle = i % 2 ? 'rgba(255,90,20,0.8)' : 'rgba(255,210,60,0.8)';
+      ctx.beginPath();
+      ctx.moveTo(x + Math.cos(a - 0.35) * r * 0.8, y + Math.sin(a - 0.35) * r * 0.8);
+      ctx.lineTo(x + Math.cos(a) * (r + len), y + Math.sin(a) * (r + len) - 6);
+      ctx.lineTo(x + Math.cos(a + 0.35) * r * 0.8, y + Math.sin(a + 0.35) * r * 0.8);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  private drawGlow(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string): void {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(x, y, r * 0.5, x, y, r * 2.4);
+    g.addColorStop(0, color + 'aa');
+    g.addColorStop(1, color + '00');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 2.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /** Cinema bars, "ПОВТОРЕНИЕ" badge, film grain lines. */
+  private drawReplayOverlay(ctx: CanvasRenderingContext2D, t: number): void {
+    const bar = Math.min(1, t / 0.3) * 62;
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, W, bar);
+    ctx.fillRect(0, H - bar, W, bar);
+    // subtle sepia-ish tint
+    ctx.fillStyle = 'rgba(40,30,80,0.12)';
+    ctx.fillRect(0, bar, W, H - bar * 2);
+    ctx.save();
+    ctx.textBaseline = 'middle';
+    ctx.font = `30px ${FONT_DISPLAY}`;
+    ctx.textAlign = 'left';
+    const blink = Math.sin(t * 6) > -0.3;
+    if (blink) {
+      ctx.fillStyle = '#ff3b4f';
+      ctx.beginPath();
+      ctx.arc(46, bar / 2, 10, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('ПОВТОРЕНИЕ', 66, bar / 2 + 2);
+    ctx.font = `16px ${FONT_TEXT}`;
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.fillText('натисни клавиш, за да пропуснеш', W - 30, H - bar / 2);
+    ctx.font = `18px ${FONT_DISPLAY}`;
+    ctx.fillStyle = '#ffd23f';
+    ctx.fillText('SLOW-MO', W - 30, bar / 2 + 2);
+    ctx.restore();
+    ctx.strokeStyle = INK;
   }
 }

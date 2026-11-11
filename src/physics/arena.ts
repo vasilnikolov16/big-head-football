@@ -7,6 +7,7 @@ import type { Rect } from './collide';
  */
 export class Arena {
   /** y of the crossbar centre for [left goal, right goal] */
+  readonly defaultGoalTop = GOAL_TOP;
   goalTop: [number, number] = [GOAL_TOP, GOAL_TOP];
   bars: [Rect, Rect] = [
     { x: 0, y: 0, w: 0, h: 0 },

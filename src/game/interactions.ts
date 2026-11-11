@@ -24,6 +24,18 @@ export interface KickResult {
 }
 
 function registerTouch(ball: Ball, p: Player, events: Emitter<GameEvents>): void {
+  // a burning ball scorches the opponent who touches it
+  if (ball.fireT > 0 && ball.fireOwner !== p.index) {
+    ball.fireT = 0;
+    p.stunT = Math.max(p.stunT, 0.55);
+    p.vx += (ball.vx > 0 ? 1 : -1) * 320;
+    p.setExpression('shock', 0.6);
+    events.emit('superHit', { player: p.index, x: p.headX, y: p.headY });
+  }
+  if (p.fireT > 0) {
+    ball.fireT = 1.6;
+    ball.fireOwner = p.index;
+  }
   ball.lastTouch = p.index;
   ball.sinceTouch = 0;
   if (p.touchCooldown <= 0) {
@@ -55,7 +67,7 @@ function tryKick(ball: Ball, p: Player, events: Emitter<GameEvents>): boolean {
   const power = 0.5 + 0.5 * sweet;
   let elev = lerp(0.5, 1.1, clamp((phase - KICK_ACTIVE_FROM) / (1 - KICK_ACTIVE_FROM), 0, 1)); // ~29°..63°
   if (ball.y < p.hipY - 14) elev *= 0.55; // volleys fly flatter
-  const speed = (760 + 650 * power) * p.power;
+  const speed = (760 + 650 * power) * p.power * (p.fireT > 0 ? 1.22 : 1);
   ball.vx = p.facing * Math.cos(elev) * speed + p.vx * 0.35;
   ball.vy = -Math.sin(elev) * speed + Math.min(p.vy, 0) * 0.25;
   ball.spin = -p.facing * (8 + 22 * phase); // backspin -> the ball floats

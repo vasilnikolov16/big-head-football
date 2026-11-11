@@ -125,7 +125,6 @@ export function drawPlayer(ctx: CanvasRenderingContext2D, p: Player, alpha: numb
   if (p.charged) drawAura(ctx, p, t);
   // squash & stretch around the feet
   ctx.scale(1 + s * 0.45, 1 - s * 0.45);
-  if (p.frozenT > 0) ctx.filter = 'hue-rotate(160deg) saturate(1.4) brightness(1.15)';
 
   if (art.bodyBack) {
     ctx.save();
@@ -193,6 +192,8 @@ export function drawPlayer(ctx: CanvasRenderingContext2D, p: Player, alpha: numb
   drawHead(ctx, p, p.headR, f, t);
   ctx.restore();
 
+  drawStatus(ctx, p, t);
+
   // dizzy stars when stunned
   if (p.stunT > 0) {
     ctx.fillStyle = '#ffe14d';
@@ -206,6 +207,77 @@ export function drawPlayer(ctx: CanvasRenderingContext2D, p: Player, alpha: numb
     }
   }
   ctx.restore();
+}
+
+/** Power-up states, drawn with the origin at the head centre. */
+function drawStatus(ctx: CanvasRenderingContext2D, p: Player, t: number): void {
+  const R = p.headR;
+  const feet = p.y - p.headY; // distance head centre -> feet
+  if (p.frozenT > 0) {
+    // ice block
+    ctx.save();
+    const w = R * 2.3;
+    const top = -R * 1.15;
+    const g = ctx.createLinearGradient(-w / 2, top, w / 2, feet);
+    g.addColorStop(0, 'rgba(200,245,255,0.55)');
+    g.addColorStop(1, 'rgba(120,200,255,0.35)');
+    ctx.fillStyle = g;
+    ctx.strokeStyle = 'rgba(230,250,255,0.95)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(-w / 2, top, w, feet - top + 4, 12);
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.35, top + 12);
+    ctx.lineTo(-w * 0.15, top + 40);
+    ctx.moveTo(w * 0.25, top + 20);
+    ctx.lineTo(w * 0.38, top + 32);
+    ctx.stroke();
+    ctx.restore();
+  }
+  if (p.reversedT > 0) {
+    ctx.save();
+    ctx.translate(0, -R - 28);
+    ctx.rotate(Math.sin(t * 6) * 0.3);
+    ctx.fillStyle = '#ff5ea8';
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, 15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 18px system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('⇄', 0, 1);
+    ctx.restore();
+  }
+  if (p.fireT > 0) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 5; i++) {
+      const x = (i - 2) * 8;
+      const h = 14 + Math.sin(t * 20 + i * 1.7) * 6;
+      ctx.fillStyle = i % 2 ? 'rgba(255,80,20,0.7)' : 'rgba(255,200,60,0.7)';
+      ctx.beginPath();
+      ctx.moveTo(x - 5, feet);
+      ctx.quadraticCurveTo(x, feet - h * 1.4, x + 5, feet);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+  if (p.jumpBoostT > 0) {
+    ctx.save();
+    ctx.strokeStyle = '#7cff6b';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let i = 0; i <= 6; i++) ctx.lineTo((i % 2 ? -7 : 7) + p.facing * 4, feet + 2 - i * 3);
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 /** Draws just the head (used by the game and by the hero-select portraits). */

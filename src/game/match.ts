@@ -7,6 +7,7 @@ import { Ball, makeImpactLog, stepBall, collideBallWorld } from '../physics/ball
 import type { CharacterDef } from './characters';
 import { ballVsPlayer, playerVsPlayer, separatePlayerFromBall } from './interactions';
 import { Player } from './player';
+import { PowerUps } from './powerups';
 import { SUPER_INFO, SuperShot, updateDecoys, type Decoy } from './supers';
 
 export type MatchPhase = 'kickoff' | 'playing' | 'goal' | 'ended';
@@ -17,6 +18,8 @@ export interface MatchConfig {
   /** short labels under the names, e.g. "P1", "CPU" */
   tags: [string, string];
   duration: number; // seconds
+  /** random power-ups on the pitch */
+  powerups: boolean;
 }
 
 /** Short text that pops up above a player (super shot names). */
@@ -71,10 +74,12 @@ export class Match {
   shockwave: { x: number; t: number } | null = null;
   /** number of super shots fired per player */
   supersUsed: [number, number] = [0, 0];
+  readonly powerups: PowerUps;
 
   constructor(config: MatchConfig) {
     this.config = config;
     this.timeLeft = config.duration;
+    this.powerups = new PowerUps(config.powerups);
     this.players = [new Player(0, config.chars[0]), new Player(1, config.chars[1])];
     this.setupKickoff();
     this.showBanner('ГОТОВИ?', '#ffffff', 1.0);
@@ -94,6 +99,7 @@ export class Match {
     this.ball.reset(W / 2 + shift, BALL_DROP_Y);
     this.endSuper();
     this.decoys = [];
+    this.powerups?.clearItems();
   }
 
   private endSuper(): void {
@@ -173,6 +179,8 @@ export class Match {
     } else {
       this.stepBallAndContacts(dt);
     }
+
+    this.powerups.update(this, dt);
 
     if (this.phase === 'playing') {
       this.updatePossession(dt);
@@ -274,6 +282,7 @@ export class Match {
   }
 
   private endMatch(): void {
+    this.powerups.endAll(this);
     this.phase = 'ended';
     this.phaseT = 0;
     this.winner = this.score[0] > this.score[1] ? 0 : this.score[1] > this.score[0] ? 1 : -1;

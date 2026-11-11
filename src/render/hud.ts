@@ -1,6 +1,9 @@
 import { FONT_DISPLAY, H, INK, W } from '../core/constants';
 import { clamp, easeOutBack, formatTime } from '../core/math';
-import type { Banner, Match } from '../game/match';
+import type { Banner } from '../game/match';
+import { POWER_INFO } from '../game/powerups';
+import { drawPowerIcon } from './powerDraw';
+import type { RenderView } from './view';
 
 function plate(ctx: CanvasRenderingContext2D, side: 0 | 1, color: string, name: string, tag: string): void {
   const dir = side === 0 ? -1 : 1;
@@ -49,7 +52,7 @@ function plate(ctx: CanvasRenderingContext2D, side: 0 | 1, color: string, name: 
 }
 
 /** Super energy bar under a name plate. */
-function energyBar(ctx: CanvasRenderingContext2D, m: Match, side: 0 | 1, t: number): void {
+function energyBar(ctx: CanvasRenderingContext2D, m: RenderView, side: 0 | 1, t: number): void {
   const p = m.players[side];
   const dir = side === 0 ? -1 : 1;
   const inner = W / 2 + dir * 100;
@@ -108,9 +111,27 @@ function energyBar(ctx: CanvasRenderingContext2D, m: Match, side: 0 | 1, t: numb
   ctx.restore();
 }
 
-export function drawHud(ctx: CanvasRenderingContext2D, m: Match, t: number): void {
+/** Active power-up effects of a player: icon + countdown ring, under the energy bar. */
+function effectIcons(ctx: CanvasRenderingContext2D, m: RenderView, side: 0 | 1): void {
+  const list = m.powerups.active.filter((e) => e.player === side || (e.player === -1 && side === 0));
+  const dir = side === 0 ? -1 : 1;
+  list.forEach((e, i) => {
+    const x = W / 2 + dir * (116 + i * 34);
+    const y = 98;
+    drawPowerIcon(ctx, e.type, x, y, 13);
+    ctx.strokeStyle = POWER_INFO[e.type].color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(x, y, 16, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (e.left / e.dur));
+    ctx.stroke();
+  });
+}
+
+export function drawHud(ctx: CanvasRenderingContext2D, m: RenderView, t: number): void {
   energyBar(ctx, m, 0, t);
   energyBar(ctx, m, 1, t);
+  effectIcons(ctx, m, 0);
+  effectIcons(ctx, m, 1);
   plate(ctx, 0, m.players[0].char.look.shirt, m.config.names[0], m.config.tags[0]);
   plate(ctx, 1, m.players[1].char.look.shirt, m.config.names[1], m.config.tags[1]);
 

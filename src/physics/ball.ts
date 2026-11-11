@@ -37,6 +37,9 @@ export class Ball {
   sinceTouch = 99;
   /** extra multipliers set by power-ups */
   gravityScale = 1;
+  /** seconds the ball keeps burning (fire-ball power-up) */
+  fireT = 0;
+  fireOwner = -1;
 
   reset(x: number, y: number): void {
     this.x = this.px = x;
@@ -45,6 +48,8 @@ export class Ball {
     this.spin = 0;
     this.lastTouch = -1;
     this.sinceTouch = 99;
+    this.fireT = 0;
+    this.fireOwner = -1;
   }
 
   savePrev(): void {
@@ -187,4 +192,5 @@ export function stepBall(b: Ball, arena: Arena, dt: number, impacts: ImpactLog):
   }
   b.spin = clamp(b.spin, -60, 60);
   b.sinceTouch += dt;
+  b.fireT = Math.max(0, b.fireT - dt);
 }

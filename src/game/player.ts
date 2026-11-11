@@ -76,6 +76,8 @@ export class Player {
   frozenT = 0;
   reversedT = 0;
   jumpBoostT = 0;
+  /** fire-ball power-up: this player's shots set the ball on fire */
+  fireT = 0;
 
   // animation / presentation
   squash = 0;
@@ -255,6 +257,7 @@ export class Player {
     this.frozenT = Math.max(0, this.frozenT - dt);
     this.reversedT = Math.max(0, this.reversedT - dt);
     this.jumpBoostT = Math.max(0, this.jumpBoostT - dt);
+    this.fireT = Math.max(0, this.fireT - dt);
     this.touchCooldown = Math.max(0, this.touchCooldown - dt);
     this.squash = approach(this.squash, 0, dt * 1.6);
     this.tickAnimation(dt);

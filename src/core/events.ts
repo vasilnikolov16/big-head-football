@@ -40,4 +40,7 @@ export type GameEvents = {
   superArmed: { player: number };
   superShot: { player: number; id: string; x: number; y: number };
   superHit: { player: number; x: number; y: number };
+  powerSpawn: { type: string; x: number };
+  powerPick: { player: number; type: string; x: number; y: number; color: string; good: boolean };
+  powerEnd: { player: number; type: string };
 };
