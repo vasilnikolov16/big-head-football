@@ -1,0 +1,197 @@
+import { GOAL_DEPTH, START_X, W } from '../core/constants';
+import { Emitter, type GameEvents, type Surface } from '../core/events';
+import { rand } from '../core/math';
+import { emptyIntent, type Controller, type PlayerIntent } from '../input/controls';
+import { Arena } from '../physics/arena';
+import { Ball, makeImpactLog, stepBall, collideBallWorld } from '../physics/ball';
+import type { CharacterDef } from './characters';
+import { ballVsPlayer, playerVsPlayer, separatePlayerFromBall } from './interactions';
+import { Player } from './player';
+
+export type MatchPhase = 'kickoff' | 'playing' | 'goal' | 'ended';
+
+export interface MatchConfig {
+  chars: [CharacterDef, CharacterDef];
+  names: [string, string];
+  duration: number; // seconds
+}
+
+export interface Banner {
+  text: string;
+  sub?: string;
+  color: string;
+  t: number; // time since shown
+  dur: number;
+}
+
+const KICKOFF_TIME = 1.1;
+const GOAL_TIME = 2.6;
+const BALL_DROP_Y = 170;
+
+export class Match {
+  readonly events = new Emitter<GameEvents>();
+  readonly arena = new Arena();
+  readonly ball = new Ball();
+  readonly players: [Player, Player];
+  readonly controllers: [Controller | null, Controller | null] = [null, null];
+  private intents: [PlayerIntent, PlayerIntent] = [emptyIntent(), emptyIntent()];
+  private idle = emptyIntent();
+  private impacts = makeImpactLog();
+
+  config: MatchConfig;
+  score: [number, number] = [0, 0];
+  timeLeft: number;
+  golden = false;
+  phase: MatchPhase = 'kickoff';
+  phaseT = 0;
+  time = 0;
+  lastScorer = -1;
+  winner = -1;
+  banner: Banner | null = null;
+  /** seconds of possession per player */
+  possession: [number, number] = [0, 0];
+
+  constructor(config: MatchConfig) {
+    this.config = config;
+    this.timeLeft = config.duration;
+    this.players = [new Player(0, config.chars[0]), new Player(1, config.chars[1])];
+    this.setupKickoff();
+    this.showBanner('ГОТОВИ?', '#ffffff', 1.0);
+  }
+
+  showBanner(text: string, color: string, dur: number, sub?: string): void {
+    this.banner = { text, color, dur, t: 0, sub };
+  }
+
+  private setupKickoff(): void {
+    this.phase = 'kickoff';
+    this.phaseT = 0;
+    this.players[0].resetPosition(START_X[0]);
+    this.players[1].resetPosition(START_X[1]);
+    this.ball.reset(W / 2, BALL_DROP_Y);
+  }
+
+  private releaseBall(): void {
+    this.phase = 'playing';
+    this.phaseT = 0;
+    this.ball.vx = rand(-50, 50);
+    this.ball.vy = 0;
+    this.events.emit('whistle', { kind: 'start' });
+  }
+
+  step(dt: number): void {
+    this.time += dt;
+    this.phaseT += dt;
+    if (this.banner) {
+      this.banner.t += dt;
+      if (this.banner.t > this.banner.dur) this.banner = null;
+    }
+
+    const controllable = this.phase === 'playing' || this.phase === 'goal';
+    for (let i = 0; i < 2; i++) {
+      const p = this.players[i];
+      p.savePrev();
+      const intent = this.intents[i];
+      const ctrl = this.controllers[i];
+      if (ctrl) ctrl.read(intent);
+      p.update(dt, controllable && ctrl ? intent : this.idle, this.arena, this.events);
+    }
+    playerVsPlayer(this.players[0], this.players[1]);
+
+    // eyes follow the ball
+    for (const p of this.players) {
+      const dx = this.ball.x - p.headX;
+      const dy = this.ball.y - p.headY;
+      const d = Math.hypot(dx, dy) || 1;
+      p.lookX += (dx / d - p.lookX) * Math.min(1, dt * 14);
+      p.lookY += (dy / d - p.lookY) * Math.min(1, dt * 14);
+    }
+
+    this.ball.savePrev();
+    if (this.phase === 'kickoff') {
+      // the ball hovers at the top, waiting for the whistle
+      this.ball.y = BALL_DROP_Y + Math.sin(this.phaseT * 6) * 4;
+      this.ball.angle += dt * 2;
+      if (this.phaseT >= KICKOFF_TIME) this.releaseBall();
+    } else {
+      this.stepBallAndContacts(dt);
+    }
+
+    if (this.phase === 'playing') {
+      this.updatePossession(dt);
+      this.checkGoal();
+      if (this.phase === 'playing' && !this.golden) {
+        this.timeLeft -= dt;
+        if (this.timeLeft <= 0) {
+          this.timeLeft = 0;
+          this.onTimeUp();
+        }
+      }
+    } else if (this.phase === 'goal' && this.phaseT >= GOAL_TIME) {
+      if (this.golden || this.timeLeft <= 0) this.endMatch();
+      else this.setupKickoff();
+    }
+  }
+
+  private stepBallAndContacts(dt: number): void {
+    const b = this.ball;
+    const imp = this.impacts;
+    imp.ground = imp.wall = imp.bar = imp.ceiling = 0;
+    stepBall(b, this.arena, dt, imp);
+    for (const p of this.players) ballVsPlayer(b, p, this.events);
+    collideBallWorld(b, this.arena, imp, dt);
+    for (const p of this.players) separatePlayerFromBall(b, p);
+
+    for (const s of ['ground', 'wall', 'bar', 'ceiling'] as Surface[]) {
+      if (imp[s] > 70) this.events.emit('bounce', { surface: s, x: b.x, y: b.y, speed: imp[s] });
+    }
+  }
+
+  private updatePossession(dt: number): void {
+    const t = this.ball.lastTouch;
+    if (t >= 0 && this.ball.sinceTouch < 4) this.possession[t] += dt;
+  }
+
+  private checkGoal(): void {
+    const b = this.ball;
+    // The whole ball must cross the goal line, under the crossbar.
+    if (b.x + b.r < GOAL_DEPTH && b.y > this.arena.goalTop[0]) this.onGoal(1);
+    else if (b.x - b.r > W - GOAL_DEPTH && b.y > this.arena.goalTop[1]) this.onGoal(0);
+  }
+
+  private onGoal(scorer: 0 | 1): void {
+    this.score[scorer]++;
+    this.lastScorer = scorer;
+    this.phase = 'goal';
+    this.phaseT = 0;
+    this.players[scorer].setExpression('happy', GOAL_TIME + 1);
+    this.players[1 - scorer].setExpression('sad', GOAL_TIME + 1);
+    const golden = this.golden;
+    this.showBanner(golden ? 'ЗЛАТЕН ГОЛ!' : 'ГОЛ!', golden ? '#ffd23f' : '#ffffff', GOAL_TIME - 0.3, this.config.names[scorer]);
+    this.events.emit('goal', { scorer, x: this.ball.x, y: this.ball.y, golden });
+  }
+
+  private onTimeUp(): void {
+    if (this.score[0] === this.score[1]) {
+      this.golden = true;
+      this.events.emit('whistle', { kind: 'golden' });
+      this.setupKickoff();
+      this.phaseT = -0.8; // a bit longer pause before the golden-goal kickoff
+      this.showBanner('ЗЛАТЕН ГОЛ', '#ffd23f', 1.9, 'Следващият гол печели!');
+    } else {
+      this.endMatch();
+    }
+  }
+
+  private endMatch(): void {
+    this.phase = 'ended';
+    this.phaseT = 0;
+    this.winner = this.score[0] > this.score[1] ? 0 : this.score[1] > this.score[0] ? 1 : -1;
+    if (this.winner >= 0) {
+      this.players[this.winner].setExpression('happy', 999);
+      this.players[1 - this.winner].setExpression('sad', 999);
+    }
+    this.events.emit('whistle', { kind: 'end' });
+    this.events.emit('matchEnd', { winner: this.winner });
+  }
+}
