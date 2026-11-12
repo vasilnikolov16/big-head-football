@@ -68,6 +68,9 @@ export function showLoader(o: LoaderOptions): void {
   drawBall(bg, 40, 40, 34, 0.4);
   logo.append(h('span', 'ld-word', t('game.title1')), ball, h('span', 'ld-word', t('game.title2')));
   const sub = h('div', 'ld-sub', t('game.subtitle'));
+  // the maker, quietly under the subtitle
+  const by = h('div', 'ld-by');
+  by.append(h('span', 'ld-by-text', 'A game by Vasil Nikolov'));
 
   // every hero pops in
   const heroes = h('div', 'ld-heroes');
@@ -93,7 +96,7 @@ export function showLoader(o: LoaderOptions): void {
   fx.className = 'ld-fx';
 
   const stage = h('div', 'ld-stage');
-  stage.append(logo, sub, heroes, bar, pct, tip);
+  stage.append(logo, sub, by, heroes, bar, pct, tip);
   // (the "tap to play" sits on the grass, outside the stage)
   root.append(stage, tap, fx);
   document.body.append(root);
