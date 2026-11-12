@@ -1,6 +1,9 @@
 import { t, tr } from '../i18n/i18n';
 import { keyLabel, type Binding } from '../input/controls';
-import type { CareerResult } from '../game/career';
+import type { Career, CareerResult } from '../game/career';
+import { dailyChallenge, todayKey } from '../game/daily';
+import { dailyDetails, dailyText } from './leagueUi';
+import { heroPortrait } from './portrait';
 import { getCharacter } from '../game/characters';
 import type { Match } from '../game/match';
 import { drawBall } from '../render/ballDraw';
@@ -23,6 +26,7 @@ export interface AppActions extends SettingsHost {
   showParty(): void;
   showShop(): void;
   showLeague(): void;
+  readonly career: Career;
   showDaily(): void;
   startPvp(): void;
   rematch(): void;
@@ -72,32 +76,79 @@ function panel(title: string, cls = ''): { root: HTMLElement; body: HTMLElement 
 
 // ------------------------------------------------------------------ main menu
 
+/** A big mode tile on the title screen. */
+function tile(icon: string, title: string, sub: string, activate: () => void, cls = '', disabled = false): NavItem {
+  const el = h('button', `tile ${cls}`);
+  el.type = 'button';
+  el.append(h('span', 'tile-icon', icon), h('span', 'tile-title', title), h('span', 'tile-sub', sub));
+  return { el, activate, disabled };
+}
+
+/** A round icon button (shop, stats, help, settings). */
+function iconBtn(icon: string, label: string, activate: () => void, cls = ''): NavItem {
+  const el = h('button', `icon-btn ${cls}`);
+  el.type = 'button';
+  el.setAttribute('aria-label', label);
+  el.title = label;
+  el.append(h('span', 'icon-btn-icon', icon), h('span', 'icon-btn-label', label));
+  return { el, activate };
+}
+
 export function mainMenu(app: AppActions): Screen {
   const root = h('div', 'scr scr-main');
-  root.append(logo());
-  const list = h('div', 'menu-list');
-  const items: NavItem[] = [
-    button(t('menu.cpu'), () => app.showCpuSetup()),
-    button(t('menu.daily'), () => app.showDaily()),
-    button(t('menu.league'), () => app.showLeague()),
-    button(t('menu.party'), () => app.showParty()),
-    button(t('menu.shop'), () => app.showShop()),
-    button(t('menu.online'), () => app.showOnline(), 'btn', false, '🌐'),
-    // two players need a keyboard (one phone screen is too small for 2 sets of buttons)
-    button(t('menu.pvp'), () => app.startPvp(), 'btn', app.touchMode, app.touchMode ? t('keyboardOnly') : undefined),
-    button(t('menu.tournament'), () => app.showTournament()),
-    button(t('menu.stats'), () => app.showStats(), 'btn btn-alt'),
-    button(t('menu.howto'), () => app.showHowTo(() => app.showMain()), 'btn btn-alt'),
-    button(t('menu.settings'), () => app.showSettings(() => app.showMain()), 'btn btn-alt'),
+  const top = h('div', 'main-top');
+  const coins = h('button', 'coins-pill main-coins', `🪙 ${app.career.coins}`);
+  coins.type = 'button';
+  coins.addEventListener('click', () => app.showShop());
+  top.append(logo(), coins);
+  root.append(top);
+
+  // play modes
+  const run = app.career.p.league;
+  const tiles: NavItem[] = [
+    tile('⚽', t('menu.cpu'), t('tile.cpu'), () => app.showCpuSetup(), 'tile-main'),
+    tile('🌐', t('menu.online'), t('tile.online'), () => app.showOnline()),
+    tile('🏅', t('menu.league'), run && run.stage !== 'done' ? t('tile.leagueOn') : t('tile.league'), () => app.showLeague()),
+    tile('🏆', t('menu.tournament'), t('tile.tournament'), () => app.showTournament()),
+    tile('🤪', t('menu.party'), t('tile.party'), () => app.showParty()),
+    tile('👥', t('menu.pvp'), app.touchMode ? t('keyboardOnly') : t('tile.pvp'), () => app.startPvp(), '', app.touchMode),
   ];
-  for (const it of items) list.append(it.el);
-  root.append(list);
+  const grid = h('div', 'tiles');
+  tiles.forEach((it) => grid.append(it.el));
+
+  // daily challenge card
+  const c = dailyChallenge();
+  const done = app.career.p.dailyDate === todayKey();
+  const daily = h('button', `daily-tile${done ? ' done' : ''}`);
+  daily.type = 'button';
+  const faces = h('div', 'daily-faces', undefined, [heroPortrait(getCharacter(c.hero), 64, { happy: true }), h('span', 'daily-vs', 'VS'), heroPortrait(getCharacter(c.opponent), 64)]);
+  daily.append(
+    h('div', 'daily-label', '📅 ' + t('menu.daily')),
+    faces,
+    h('div', 'daily-tile-task', dailyText(c)),
+    h('div', 'daily-tile-details', dailyDetails(c)),
+    h('div', 'daily-tile-reward', done ? '✓ ' + t('daily.doneToday') : t('daily.reward', { n: c.reward })),
+  );
+  const dailyItem: NavItem = { el: daily, activate: () => app.showDaily() };
+
+  const middle = h('div', 'main-middle', undefined, [grid, daily]);
+  root.append(middle);
+
+  // bottom bar: shop, stats, help | settings cog
+  const shop = iconBtn('🛒', t('menu.shop'), () => app.showShop(), 'shop-btn');
+  const stats = iconBtn('📊', t('menu.statsShort'), () => app.showStats());
+  const help = iconBtn('❓', t('menu.howto'), () => app.showHowTo(() => app.showMain()));
+  const cog = iconBtn('⚙️', t('menu.settings'), () => app.showSettings(() => app.showMain()), 'cog');
+  const bottom = h('div', 'main-bottom', undefined, [h('div', 'main-bottom-left', undefined, [shop.el, stats.el, help.el]), cog.el]);
+  root.append(bottom);
+
   if (!app.touchMode) root.append(hints(t('menu.hints')));
   else {
     const tip = installTip();
     if (tip) root.append(hints(tip));
   }
-  return { id: 'main', root, items };
+  const items = [...tiles, dailyItem, shop, stats, help, cog];
+  return { id: 'main', root, items, initial: 0 };
 }
 
 // ------------------------------------------------------------------ vs CPU setup
