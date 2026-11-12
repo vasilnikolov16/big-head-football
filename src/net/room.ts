@@ -1,11 +1,12 @@
 import type { DataConnection, Peer, PeerError } from 'peerjs';
+import { ICE_CONFIG } from './ice';
 import { cleanName, PROTOCOL, randomCode, ROOM_PREFIX, type LobbyOptions, type Msg, type Role } from './protocol';
 
 /**
  * A two-player "room" on top of WebRTC (PeerJS). The host registers the room
  * code on the free public PeerJS signalling server; the guest connects to it
- * directly, browser to browser (PeerJS also provides a TURN relay for
- * networks where a direct connection is impossible).
+ * directly, browser to browser (see ice.ts for the relay used when a direct
+ * connection is impossible).
  *
  * Two data channels: a reliable ordered one for lobby/events, and an
  * unordered one for the 60 Hz state/input stream (a lost packet never holds
@@ -111,7 +112,7 @@ export class Room {
     const PeerC = await loadPeer();
     for (let attempt = 0; attempt < 6; attempt++) {
       const code = randomCode();
-      const peer = new PeerC(ROOM_PREFIX + code, { debug: 0 });
+      const peer = new PeerC(ROOM_PREFIX + code, { debug: 0, config: ICE_CONFIG });
       try {
         await waitOpen(peer);
       } catch (e) {
@@ -129,7 +130,7 @@ export class Room {
 
   static async join(code: string, name: string): Promise<Room> {
     const PeerC = await loadPeer();
-    const peer = new PeerC({ debug: 0 });
+    const peer = new PeerC({ debug: 0, config: ICE_CONFIG });
     try {
       await waitOpen(peer);
     } catch (e) {
