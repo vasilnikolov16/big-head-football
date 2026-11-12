@@ -149,6 +149,11 @@ export class AudioEngine {
     }
 
     this.startCrowd();
+    // iPhone: the context is often created "suspended" and starts running a moment
+    // later (after the tap): start the music then too, not only when it is created
+    ctx.onstatechange = () => {
+      if (ctx.state === 'running') this.onReady?.();
+    };
     this.onReady?.();
   }
 

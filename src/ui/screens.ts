@@ -141,7 +141,10 @@ export function mainMenu(app: AppActions): Screen {
   const help = iconBtn('❓', t('menu.howto'), () => app.showHowTo(() => app.showMain()));
   const wheel = iconBtn('🎡', t('menu.wheel'), () => app.showWheel(), app.career.canSpin() ? 'wheel-btn ready' : 'wheel-btn');
   const cog = iconBtn('⚙️', t('menu.settings'), () => app.showSettings(() => app.showMain()), 'cog');
-  const bottom = h('div', 'main-bottom', undefined, [h('div', 'main-bottom-left', undefined, [wheel.el, shop.el, stats.el, help.el]), cog.el]);
+  const sign = h('div', 'made-by');
+  sign.append(h('span', 'made-by-ball', '⚽'), h('span', 'made-by-text', 'Vasil Nikolov'));
+  sign.title = t('madeBy');
+  const bottom = h('div', 'main-bottom', undefined, [h('div', 'main-bottom-left', undefined, [wheel.el, shop.el, stats.el, help.el]), sign, cog.el]);
   root.append(bottom);
 
   if (!app.touchMode) root.append(hints(t('menu.hints')));

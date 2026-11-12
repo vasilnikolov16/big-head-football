@@ -88,7 +88,7 @@ export class Game implements AppActions {
   private t = 0;
   private postShown = false;
   readonly audio = new AudioEngine();
-  private music = new Music(this.audio);
+  readonly music = new Music(this.audio);
   private gameAudio = new GameAudio(this.audio);
   private recorder = new Recorder();
   private replay: ReplayPlayer | null = null;

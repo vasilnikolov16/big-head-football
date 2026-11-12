@@ -28,13 +28,8 @@ async function boot(): Promise<void> {
   setRotate();
   game.start();
   // the opening show; the tap that closes it also unlocks the sound (iPhone)
-  showLoader({
-    onClose: () =>
-      window.setTimeout(() => {
-        game.audio.play('kickPerfect');
-        game.audio.play('goal', 0.55);
-      }, 90),
-  });
+  // (the tap that closes it unlocks the sound, so the menu music starts right then)
+  showLoader({ onClose: () => game.music.start() });
   if (import.meta.env.DEV) (window as unknown as { __game: Game }).__game = game;
 }
 

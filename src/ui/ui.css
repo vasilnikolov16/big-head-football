@@ -2749,3 +2749,49 @@ canvas {
 .icon-btn.wheel-btn.ready .icon-btn-icon {
   animation: spin 3s linear infinite;
 }
+
+/* the maker's signature: tiny, quiet, a little shine now and then */
+.made-by {
+  pointer-events: auto;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-family: var(--display);
+  font-size: 13px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: rgba(214, 218, 255, 0.38);
+  cursor: default;
+  transition: color 0.3s;
+}
+.made-by-text {
+  background: linear-gradient(100deg, rgba(214, 218, 255, 0.38) 40%, #fff3b0 50%, rgba(214, 218, 255, 0.38) 60%);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: signShine 7s ease-in-out infinite;
+}
+.made-by-ball {
+  font-size: 12px;
+  opacity: 0.5;
+  display: inline-block;
+}
+.made-by:hover .made-by-ball {
+  animation: spin 1s linear infinite;
+  opacity: 1;
+}
+.made-by:hover {
+  color: var(--gold);
+}
+@keyframes signShine {
+  0%,
+  70% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}

@@ -15,7 +15,8 @@
 }
 .ld-stage {
   position: absolute;
-  inset: 0;
+  /* everything sits above the strip of grass at the bottom */
+  inset: 0 0 22% 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -282,7 +283,7 @@
 }
 .ld-tap {
   position: absolute;
-  bottom: 7vh;
+  bottom: 7%;
   left: 0;
   right: 0;
   text-align: center;
@@ -343,5 +344,41 @@
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* short screens (phones on their side): smaller pieces, nothing reaches the grass */
+@media (max-height: 520px) {
+  .ld-stage {
+    gap: 1.4vh;
+    padding-top: 2vh;
+  }
+  .ld-word {
+    font-size: min(13vh, 9vw);
+  }
+  .ld-logo-ball {
+    width: 8.5vh;
+    height: 8.5vh;
+  }
+  .ld-sub {
+    font-size: 2.8vh;
+  }
+  .ld-heroes .portrait {
+    width: 7.6vh !important;
+    height: 7.6vh !important;
+  }
+  .ld-bar {
+    height: 4vh;
+    margin-top: 0.5vh;
+    border-width: 3px;
+  }
+  .ld-pct {
+    font-size: 5.6vh;
+  }
+  .ld-tip {
+    font-size: 3.4vh;
+  }
+  .ld-tap {
+    font-size: 5vh;
   }
 }

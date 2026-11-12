@@ -93,8 +93,9 @@ export function showLoader(o: LoaderOptions): void {
   fx.className = 'ld-fx';
 
   const stage = h('div', 'ld-stage');
-  stage.append(logo, sub, heroes, bar, pct, tip, tap);
-  root.append(stage, fx);
+  stage.append(logo, sub, heroes, bar, pct, tip);
+  // (the "tap to play" sits on the grass, outside the stage)
+  root.append(stage, tap, fx);
   document.body.append(root);
 
   // ---------------------------------------------------------------- particles (sparks + confetti)

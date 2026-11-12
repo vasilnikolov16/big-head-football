@@ -106,6 +106,7 @@ const S: Record<string, [string, string]> = {
   'menu.shop': ['Магазин', 'Shop'],
   'menu.statsShort': ['Статистика', 'Stats'],
   'menu.wheel': ['Колело', 'Wheel'],
+  'madeBy': ['Играта е направена от Vasil Nikolov', 'Game made by Vasil Nikolov'],
   'ld.tap': ['Натисни, за да играеш ▸', 'Tap to play ▸'],
   'ld.tip1': ['Надуваме топката…', 'Pumping up the ball…'],
   'ld.tip2': ['Връзваме обувките на Бобо…', 'Tying Bobo’s boots…'],
