@@ -87,16 +87,10 @@ export interface MatchRules {
   allSuper?: boolean;
 }
 
-export type PartyMode = 'heads' | 'lowgrav' | 'double' | 'allsuper';
-export const PARTY_IDS: PartyMode[] = ['heads', 'lowgrav', 'double', 'allsuper'];
+export type PartyMode = 'lowgrav' | 'double' | 'allsuper';
+export const PARTY_IDS: PartyMode[] = ['lowgrav', 'double', 'allsuper'];
 
 export const PARTY_MODES: Record<PartyMode, { name: { bg: string; en: string }; desc: { bg: string; en: string }; icon: string; rules: MatchRules }> = {
-  heads: {
-    name: { bg: 'Само глави', en: 'Heads Only' },
-    desc: { bg: 'Ритниците не работят. Само глави и тяло!', en: 'Kicks don’t work. Heads and bodies only!' },
-    icon: '🧠',
-    rules: { headsOnly: true },
-  },
   lowgrav: {
     name: { bg: 'Ниска гравитация', en: 'Low Gravity' },
     desc: { bg: 'Мач на Луната: огромни скокове и топка, която не пада.', en: 'A match on the Moon: huge jumps and a ball that won’t come down.' },

@@ -1,7 +1,7 @@
 import { t, tr } from '../i18n/i18n';
-import { STADIUM_IDS, STADIUMS, type StadiumId } from '../game/stadiums';
+import { PARTY_IDS, PARTY_MODES, STADIUM_IDS, STADIUMS, type PartyMode, type StadiumId } from '../game/stadiums';
 import { CODE_LEN, MAX_NAME, cleanName, normalizeCode, type LobbyOptions } from '../net/protocol';
-import { button, h, optionRow, textRow, type NavItem, type Screen } from './ui';
+import { button, h, optionRow, textRow, type NavItem, type Screen, iconRow } from './ui';
 
 function panel(title: string, cls = ''): { root: HTMLElement; box: HTMLElement; body: HTMLElement } {
   const root = h('div', `scr scr-panel online ${cls}`);
@@ -166,6 +166,8 @@ export function lobbyScreen(o: LobbyOptionsUi): { screen: Screen; refresh: () =>
   const puLabel = h('span', 'opt-chip on');
   const stLabel = h('span', 'opt-chip on');
   let stItem: NavItem | null = null;
+  let modeItem: NavItem | null = null;
+  const modeLabel = h('span', 'opt-chip on');
   if (st0.isHost) {
     durItem = optionRow(
       t('cpu.duration'),
@@ -182,13 +184,19 @@ export function lobbyScreen(o: LobbyOptionsUi): { screen: Screen; refresh: () =>
       () => o.get().opts.powerups,
       (v) => o.setOpts({ ...o.get().opts, powerups: v }),
     );
-    stItem = optionRow<StadiumId>(
+    stItem = iconRow<StadiumId>(
       t('stadium'),
-      STADIUM_IDS.map((id) => ({ value: id, label: STADIUMS[id].icon + ' ' + tr(STADIUMS[id].name) })),
+      STADIUM_IDS.map((id) => ({ value: id, icon: STADIUMS[id].icon, name: tr(STADIUMS[id].name) })),
       () => o.get().opts.stadium,
       (v) => o.setOpts({ ...o.get().opts, stadium: v }),
     );
-    setBox.append(durItem.el, puItem.el, stItem.el);
+    modeItem = iconRow<PartyMode | 'none'>(
+      t('online.mode'),
+      [{ value: 'none' as PartyMode | 'none', icon: '⚽', name: t('online.modeNormal') }, ...PARTY_IDS.map((id) => ({ value: id as PartyMode | 'none', icon: PARTY_MODES[id].icon, name: tr(PARTY_MODES[id].name) }))],
+      () => o.get().opts.party,
+      (v) => o.setOpts({ ...o.get().opts, party: v }),
+    );
+    setBox.append(durItem.el, puItem.el, stItem.el, modeItem.el);
   } else {
     const r1 = h('div', 'opt-row static');
     r1.append(h('span', 'opt-label', t('cpu.duration')), h('div', 'opt-seg', undefined, [durLabel]));
@@ -196,7 +204,9 @@ export function lobbyScreen(o: LobbyOptionsUi): { screen: Screen; refresh: () =>
     r2.append(h('span', 'opt-label', t('settings.powerups')), h('div', 'opt-seg', undefined, [puLabel]));
     const r3 = h('div', 'opt-row static');
     r3.append(h('span', 'opt-label', t('stadium')), h('div', 'opt-seg', undefined, [stLabel]));
-    setBox.append(r1, r2, r3, h('p', 'desc small', t('online.hostPicks')));
+    const r4 = h('div', 'opt-row static');
+    r4.append(h('span', 'opt-label', t('online.mode')), h('div', 'opt-seg', undefined, [modeLabel]));
+    setBox.append(r1, r2, r3, r4, h('p', 'desc small', t('online.hostPicks')));
   }
 
   const note = h('div', 'net-status info');
@@ -205,7 +215,7 @@ export function lobbyScreen(o: LobbyOptionsUi): { screen: Screen; refresh: () =>
   const grid = h('div', 'lobby-grid', undefined, [codeBox, h('div', 'lobby-side', undefined, [players, setBox])]);
   body.append(grid, note, h('div', 'row-buttons', undefined, st0.isHost ? [go.el, leave.el] : [leave.el]));
 
-  if (st0.isHost) items.push(go, durItem!, puItem!, stItem!, copyCode, copyLink, leave);
+  if (st0.isHost) items.push(go, durItem!, puItem!, stItem!, modeItem!, copyCode, copyLink, leave);
   else items.push(copyCode, copyLink, leave);
 
   let hadGuest = !!st0.remoteName;
@@ -215,6 +225,9 @@ export function lobbyScreen(o: LobbyOptionsUi): { screen: Screen; refresh: () =>
     const guestName = s.isHost ? s.remoteName : s.localName;
     const pingText = s.ping > 0 ? t('online.ping', { n: Math.round(s.ping) }) : '';
     const fill = (row: HTMLElement, name: string, isHostRow: boolean, local: boolean): void => {
+      const key = `${name}|${local}|${local ? '' : pingText}`;
+      if (row.dataset.key === key) return;
+      row.dataset.key = key;
       row.innerHTML = '';
       if (!name) {
         row.classList.add('empty');
@@ -235,6 +248,8 @@ export function lobbyScreen(o: LobbyOptionsUi): { screen: Screen; refresh: () =>
     puLabel.textContent = s.opts.powerups ? t('on') : t('off');
     const sti = STADIUMS[s.opts.stadium] ?? STADIUMS.classic;
     stLabel.textContent = sti.icon + ' ' + tr(sti.name);
+    const pm = s.opts.party !== 'none' ? PARTY_MODES[s.opts.party] : null;
+    modeLabel.textContent = pm ? pm.icon + ' ' + tr(pm.name) : '⚽ ' + t('online.modeNormal');
     note.textContent = s.note;
     note.style.display = s.note ? '' : 'none';
     if (s.isHost) setDisabled(go, !s.remoteName);

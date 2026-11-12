@@ -2019,7 +2019,7 @@ canvas {
 }
 .party-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 14px;
   margin-bottom: 6px;
 }
@@ -2555,4 +2555,125 @@ canvas {
 }
 .scr-main .hints {
   bottom: 96px;
+}
+
+/* compact icon picker */
+.icon-seg {
+  display: flex;
+  gap: 5px;
+  padding: 4px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.35);
+}
+.icon-chip {
+  width: 46px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  font-size: 23px;
+  cursor: pointer;
+  opacity: 0.5;
+  filter: grayscale(0.6);
+  transition:
+    background 0.15s,
+    opacity 0.15s,
+    transform 0.15s;
+}
+.icon-chip:hover {
+  opacity: 0.85;
+}
+.icon-chip.on {
+  opacity: 1;
+  filter: none;
+  background: linear-gradient(180deg, #ffe066, #f4b400);
+  transform: scale(1.06);
+}
+.icon-row .opt-label {
+  white-space: nowrap;
+}
+
+/* scrolling areas keep scrolling when really needed, but never show a bar that
+   pops in and out and makes the layout jump */
+.scr-panel > .panel > .panel-body,
+.scr-panel > .panel > .tab-body,
+.shop-grid,
+.league-body,
+.ach-grid {
+  scrollbar-width: none;
+}
+.scr-panel > .panel > .panel-body::-webkit-scrollbar,
+.scr-panel > .panel > .tab-body::-webkit-scrollbar,
+.shop-grid::-webkit-scrollbar,
+.league-body::-webkit-scrollbar,
+.ach-grid::-webkit-scrollbar {
+  display: none;
+}
+.scr-panel > .panel > .panel-body,
+.scr-panel > .panel > .tab-body {
+  padding-right: 0;
+  margin-right: 0;
+}
+
+/* the waiting spinner: its own layer, steady rotation */
+.spinner {
+  will-change: transform;
+  animation: spin 0.9s linear infinite;
+}
+
+/* compact panels: everything fits on a phone without scrolling */
+.panel {
+  padding: 18px 32px 20px;
+}
+.panel-title {
+  font-size: 36px;
+  margin-bottom: 10px;
+}
+.panel .tabs {
+  margin-bottom: 10px;
+}
+.opt-row {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.tab-body {
+  gap: 8px;
+  min-height: 0;
+}
+.panel-body {
+  gap: 10px;
+}
+.controls .ctrl-card,
+.tab-body .ctrl-card {
+  padding: 8px 14px;
+}
+.tab-body .ctrl-card h3 {
+  margin-bottom: 4px;
+}
+.tab-body .bind-row {
+  margin: 2px 0;
+}
+.tab-body .bind-msg {
+  margin: 0;
+}
+.panel .hints {
+  margin-top: 8px;
+}
+.panel .desc {
+  margin: 0 0 2px;
+}
+.tab-body .bind-row {
+  padding-top: 1px;
+  padding-bottom: 1px;
+}
+/* short (phone) screens: keyboard hints are not needed and only take room */
+@media (max-height: 520px) {
+  .panel .hints {
+    display: none;
+  }
+}
+/* room for the selected (slightly grown) button inside a scroll area */
+.scr-panel > .panel > .panel-body {
+  padding: 2px 4px 8px;
 }

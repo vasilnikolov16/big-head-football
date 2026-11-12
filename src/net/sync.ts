@@ -169,6 +169,7 @@ export class HostSync {
       sc: [m.score[0], m.score[1]],
       w: m.winner,
       b: [r1(b.x), r1(b.y), r2(b.angle), r1(b.r), r1(b.vx), r1(b.vy), r2(b.fireT)],
+      x2: m.extraBalls.length ? m.extraBalls.map((e) => [r1(e.x), r1(e.y), r2(e.angle)] as [number, number, number]) : undefined,
       p: [packPlayer(m.players[0]), packPlayer(m.players[1])],
       gt: [r1(m.arena.goalTop[0]), r1(m.arena.goalTop[1])],
       it: m.powerups.items.map((it) => [it.type, r1(it.x), r1(it.y), r2(it.life), it.landed ? 1 : 0, r2(it.t)]),
@@ -375,6 +376,15 @@ export class GuestSync {
     ball.vx = b.b[4];
     ball.vy = b.b[5];
     ball.fireT = b.b[6];
+    // extra balls (double ball)
+    m.extraBalls.forEach((e, i) => {
+      const ea = a.x2?.[i];
+      const eb = b.x2?.[i];
+      if (!eb) return;
+      e.px = e.x = ea ? lerp(ea[0], eb[0], k) : eb[0];
+      e.py = e.y = ea ? lerp(ea[1], eb[1], k) : eb[1];
+      e.pangle = e.angle = ea ? lerp(ea[2], eb[2], k) : eb[2];
+    });
 
     for (let n = 0; n < 2; n++) {
       const p = m.players[n];

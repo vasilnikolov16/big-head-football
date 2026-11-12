@@ -237,6 +237,41 @@ export function optionRow<T>(
   return { el, left: () => shift(-1), right: () => shift(1) };
 }
 
+/**
+ * A compact row of icon chips; the label shows the name of the current value
+ * ("Stadium: Rain"). Fits five or six choices without making panels wider.
+ */
+export function iconRow<T>(label: string, values: Array<{ value: T; icon: string; name: string }>, get: () => T, set: (v: T) => void): NavItem {
+  const el = h('div', 'opt-row icon-row');
+  const lab = h('span', 'opt-label');
+  const seg = h('div', 'icon-seg');
+  const chips = values.map((v) => {
+    const c = h('span', 'icon-chip', v.icon);
+    c.title = v.name;
+    c.addEventListener('click', (e) => {
+      e.stopPropagation();
+      set(v.value);
+      refresh();
+    });
+    seg.append(c);
+    return c;
+  });
+  el.append(lab, seg);
+  const refresh = (): void => {
+    const cur = get();
+    const i = values.findIndex((v) => v.value === cur);
+    values.forEach((_v, n) => chips[n].classList.toggle('on', n === i));
+    lab.textContent = `${label}: ${values[i]?.name ?? ''}`;
+  };
+  const shift = (d: number): void => {
+    const i = values.findIndex((v) => v.value === get());
+    set(values[(i + d + values.length) % values.length].value);
+    refresh();
+  };
+  refresh();
+  return { el, left: () => shift(-1), right: () => shift(1) };
+}
+
 /** A 0..1 value with a real 0–100 % slider (drag, click, or ←/→ in steps of 5 %). */
 export function sliderRow(label: string, get: () => number, set: (v: number) => void): NavItem {
   const el = h('div', 'opt-row');

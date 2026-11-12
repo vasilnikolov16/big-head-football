@@ -232,12 +232,13 @@ export class Match {
     }
 
     this.ball.savePrev();
+    // (the extra balls too: the renderer draws between the previous and the current step)
+    for (const eb of this.extraBalls) eb.savePrev();
     if (this.phase === 'kickoff') {
       // the ball hovers at the top, waiting for the whistle
       this.ball.y = BALL_DROP_Y + Math.sin(this.phaseT * 6) * 4;
       this.ball.angle += dt * 2;
       for (const b of this.extraBalls) {
-        b.savePrev();
         b.y = BALL_DROP_Y - 40 + Math.sin(this.phaseT * 6 + 1) * 4;
       }
       if (this.phaseT >= KICKOFF_TIME) this.releaseBall();

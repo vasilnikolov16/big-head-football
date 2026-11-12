@@ -65,7 +65,7 @@ const defaults = (): Settings => ({
   musicVolume: 0.5,
   crowdVolume: 0.7,
   stadium: 'classic',
-  party: 'heads',
+  party: 'lowgrav',
   partyTwo: false,
   powerups: true,
   replays: false,
@@ -145,7 +145,7 @@ export function loadSettings(): Settings {
   s.showFps = s.showFps === true;
   s.crowdVolume = clamp01(s.crowdVolume, d.crowdVolume);
   if (s.stadium !== 'random' && !STADIUM_IDS.includes(s.stadium)) s.stadium = 'classic';
-  if (!PARTY_IDS.includes(s.party)) s.party = 'heads';
+  if (!PARTY_IDS.includes(s.party)) s.party = 'lowgrav';
   s.partyTwo = s.partyTwo === true;
   s.shake = s.shake !== false;
   s.cinematic = s.cinematic !== false;

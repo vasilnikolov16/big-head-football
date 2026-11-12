@@ -136,7 +136,7 @@ export class Room {
       peer.destroy();
       throw e;
     }
-    const room = new Room(peer, 'guest', code, name, { duration: 60, powerups: true, stadium: 'classic' });
+    const room = new Room(peer, 'guest', code, name, { duration: 60, powerups: true, stadium: 'classic', party: 'none' });
     try {
       await room.connectToHost();
     } catch (e) {

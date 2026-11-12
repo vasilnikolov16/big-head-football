@@ -1,5 +1,5 @@
 import type { GameEvents } from '../core/events';
-import { STADIUM_IDS, type StadiumId } from '../game/stadiums';
+import { PARTY_IDS, STADIUM_IDS, type PartyMode, type StadiumId } from '../game/stadiums';
 import { COS_CATS, cosItem, DEFAULT_EQUIP, type Equip } from '../game/cosmetics';
 
 /** the other player's cosmetics, keeping only items that exist */
@@ -16,7 +16,7 @@ import type { PlayerMatchStats } from '../game/player';
 import type { MatchSummary } from '../game/tracker';
 
 /** Bump when the messages change: players on different versions can't play together. */
-export const PROTOCOL = 6;
+export const PROTOCOL = 7;
 /** Public signalling ids are global: prefix them so we never collide with other apps. */
 export const ROOM_PREFIX = 'kratunball-r1-';
 /** No I, O, 0, 1: nothing that can be misread when a code is dictated. */
@@ -29,6 +29,8 @@ export interface LobbyOptions {
   duration: 30 | 60 | 90;
   powerups: boolean;
   stadium: StadiumId;
+  /** crazy mode, or a normal match */
+  party: PartyMode | 'none';
 }
 
 /** keeps only what is valid from options received over the network */
@@ -38,6 +40,7 @@ export function cleanOpts(o: Partial<LobbyOptions> | undefined): LobbyOptions {
     duration: d === 30 || d === 90 ? d : 60,
     powerups: o?.powerups !== false,
     stadium: o?.stadium && STADIUM_IDS.includes(o.stadium) ? o.stadium : 'classic',
+    party: o?.party && PARTY_IDS.includes(o.party as PartyMode) ? (o.party as PartyMode) : 'none',
   };
 }
 
@@ -118,6 +121,8 @@ export interface Snapshot {
   w: number;
   /** ball: x, y, angle, r, vx, vy, fireT */
   b: [number, number, number, number, number, number, number];
+  /** party mode "double ball": x, y, angle of the extra balls */
+  x2?: Array<[number, number, number]>;
   p: [PlayerPack, PlayerPack];
   gt: [number, number];
   /** power-up items: type, x, y, life, landed, t */

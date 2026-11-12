@@ -180,6 +180,8 @@ const S: Record<string, [string, string]> = {
   'shop.cancel': ['Отказ', 'Cancel'],
   'shop.bought': ['Купено!', 'Bought!'],
   'stadium.random': ['Случаен', 'Random'],
+  'online.mode': ['Режим', 'Mode'],
+  'online.modeNormal': ['Нормален мач', 'Normal match'],
   'menu.party': ['Луди режими', 'Crazy modes'],
   'party.title': ['Луди режими', 'Crazy modes'],
   'party.sub': ['Избери правилата на лудостта', 'Pick the rules of madness'],

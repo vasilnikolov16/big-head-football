@@ -2,6 +2,7 @@ import { t, tr } from '../i18n/i18n';
 import { menuKeys } from '../input/controls';
 import { CHARACTERS, getCharacter } from '../game/characters';
 import { DEFAULT_EQUIP, type Equip } from '../game/cosmetics';
+import { PARTY_MODES } from '../game/stadiums';
 import type { Game } from '../game/game';
 import { Match } from '../game/match';
 import { MatchTracker } from '../game/tracker';
@@ -151,7 +152,7 @@ export class OnlineSession {
     this.menuApi?.setStatus(t('online.creating'), 'busy');
     try {
       const st = g.settings.stadium;
-      const room = await Room.create(name, { duration: g.settings.duration, powerups: g.settings.powerups, stadium: st === 'random' ? 'classic' : st });
+      const room = await Room.create(name, { duration: g.settings.duration, powerups: g.settings.powerups, stadium: st === 'random' ? 'classic' : st, party: 'none' });
       this.attach(room);
       this.note = '';
       this.showLobby();
@@ -320,6 +321,7 @@ export class OnlineSession {
       duration: opts.duration,
       powerups: opts.powerups,
       stadium: opts.stadium,
+      rules: opts.party !== 'none' ? PARTY_MODES[opts.party].rules : undefined,
     };
   }
 
@@ -493,6 +495,8 @@ export class OnlineSession {
     const result = g.career.record({
       mode: 'online',
       humans: [this.side],
+      stadium: this.room?.opts.stadium,
+      party: this.room && this.room.opts.party !== 'none' ? this.room.opts.party : undefined,
       heroes: [this.heroes[0], this.heroes[1]],
       difficulty: 'medium',
       summary: e.summary,

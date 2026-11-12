@@ -1,6 +1,7 @@
 import type { Difficulty } from '../ai/aiController';
 import { CHARACTERS } from './characters';
 import { cosItem, cosKey, isDefault, type CosCat } from './cosmetics';
+import { PARTY_IDS } from './stadiums';
 import { loadProgress, saveProgress, freshProgress, type Progress, type TournamentRun } from './progress';
 import type { MatchSummary } from './tracker';
 
@@ -32,7 +33,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'streak3', icon: '🔥', name: { bg: 'В серия', en: 'On fire' }, desc: { bg: '3 поредни победи срещу компютъра.', en: '3 wins in a row against the computer.' } },
   { id: 'online_win', icon: '🌐', name: { bg: 'Световна звезда', en: 'World star' }, desc: { bg: 'Спечели онлайн мач.', en: 'Win an online match.' } },
   { id: 'blocker', icon: '🛡️', name: { bg: 'Стена', en: 'The Wall' }, desc: { bg: 'Спри 5 супер удара.', en: 'Stop 5 super shots.' } },
-  { id: 'party_animal', icon: '🎉', name: { bg: 'Купонджия', en: 'Party animal' }, desc: { bg: 'Изиграй и четирите луди режима. Награда: диско топка.', en: 'Play all four crazy modes. Reward: disco ball.' } },
+  { id: 'party_animal', icon: '🎉', name: { bg: 'Купонджия', en: 'Party animal' }, desc: { bg: 'Изиграй и трите луди режима. Награда: диско топка.', en: 'Play all three crazy modes. Reward: disco ball.' } },
   { id: 'weather_master', icon: '🌦️', name: { bg: 'Метеоролог', en: 'Weatherman' }, desc: { bg: 'Спечели на всеки стадион. Награда: ледени обувки.', en: 'Win in every stadium. Reward: ice shoes.' } },
   { id: 'league_champ', icon: '🏅', name: { bg: 'Шампион на лигата', en: 'League champion' }, desc: { bg: 'Спечели лигата. Награда: корона.', en: 'Win the league. Reward: a crown.' } },
   { id: 'daily_hero', icon: '📅', name: { bg: 'Всеки ден', en: 'Every day' }, desc: { bg: 'Изпълни 5 предизвикателства на деня. Награда: звезден дъжд.', en: 'Complete 5 daily challenges. Reward: star shower.' } },
@@ -295,7 +296,7 @@ export class Career {
       if (won && (vsCpu || online) && info.stadium && !st.stadiumWins.includes(info.stadium)) st.stadiumWins.push(info.stadium);
       if (st.stadiumWins.length >= 5) this.award('weather_master', a);
       if (info.party && !st.partyModes.includes(info.party)) st.partyModes.push(info.party);
-      if (st.partyModes.length >= 4) this.award('party_animal', a);
+      if (PARTY_IDS.every((id) => st.partyModes.includes(id))) this.award('party_animal', a);
       if (Object.keys(st.heroGames).length >= 12) this.award('hero_tester', a);
 
       // coins

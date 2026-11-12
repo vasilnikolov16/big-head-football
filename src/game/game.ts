@@ -390,7 +390,7 @@ export class Game implements AppActions {
     this.ui.show(
       leagueScreen({
         run: this.career.p.league,
-        difficulty: this.leagueDiff,
+        difficulty: () => this.leagueDiff,
         setDifficulty: (d) => (this.leagueDiff = d),
         start: () =>
           this.showHeroSelect(

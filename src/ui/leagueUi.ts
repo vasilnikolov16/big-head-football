@@ -11,7 +11,7 @@ import { button, h, optionRow, type NavItem, type Screen } from './ui';
 
 export interface LeagueOptions {
   run: LeagueRun | null;
-  difficulty: LeagueRun['difficulty'];
+  difficulty: () => LeagueRun['difficulty'];
   setDifficulty: (d: LeagueRun['difficulty']) => void;
   /** pick a hero and start a new season */
   start: () => void;
@@ -39,7 +39,7 @@ export function leagueScreen(o: LeagueOptions): Screen {
         { value: 'medium', label: t('diff.medium') },
         { value: 'hard', label: t('diff.hard') },
       ],
-      () => o.difficulty,
+      o.difficulty,
       (v) => o.setDifficulty(v),
     );
     const go = button(t('league.start'), o.start, 'btn btn-go');

@@ -43,7 +43,7 @@ export function dailyChallenge(date = todayKey()): DailyChallenge {
   const opponent = pick(CHARACTERS.filter((c) => c.id !== hero)).id;
   const difficulty = pick<Difficulty>(['easy', 'medium', 'medium', 'hard']);
   const stadium = pick(STADIUM_IDS);
-  const party = rnd() < 0.25 ? pick(PARTY_IDS.filter((p) => p !== 'heads')) : null;
+  const party = rnd() < 0.25 ? pick(PARTY_IDS) : null;
   const goal = pick<GoalKind>(['win', 'winBy', 'score', 'clean', 'header', 'super', 'block']);
   const n = goal === 'winBy' ? 2 : goal === 'score' ? (difficulty === 'hard' ? 2 : 3) : 1;
   return { date, hero, opponent, difficulty, stadium, party, goal, n, reward: DAILY_REWARD };

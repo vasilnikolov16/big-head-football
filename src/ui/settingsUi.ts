@@ -13,7 +13,7 @@ import {
   type Action,
 } from '../input/controls';
 import { cleanName, MAX_NAME } from '../net/protocol';
-import { button, h, keycap, optionRow, sliderRow, textRow, type NavItem, type Screen, type UI } from './ui';
+import { button, h, iconRow, keycap, optionRow, sliderRow, textRow, type NavItem, type Screen, type UI } from './ui';
 
 export type SettingsTab = 'sound' | 'game' | 'display' | 'buttons' | 'controls' | 'online' | 'language';
 const TABS: SettingsTab[] = ['sound', 'game', 'display', 'buttons', 'controls', 'online', 'language'];
@@ -72,9 +72,9 @@ export function difficultyRow(host: SettingsHost, label = t('settings.cpuDiff'),
 
 /** Stadium (weather) for local matches. */
 export function stadiumRow(host: SettingsHost): NavItem {
-  return optionRow<StadiumId | 'random'>(
+  return iconRow<StadiumId | 'random'>(
     t('stadium'),
-    [...STADIUM_IDS.map((id) => ({ value: id as StadiumId | 'random', label: STADIUMS[id].icon + ' ' + tr(STADIUMS[id].name) })), { value: 'random', label: '🎲 ' + t('stadium.random') }],
+    [...STADIUM_IDS.map((id) => ({ value: id as StadiumId | 'random', icon: STADIUMS[id].icon, name: tr(STADIUMS[id].name) })), { value: 'random', icon: '🎲', name: t('stadium.random') }],
     () => host.settings.stadium,
     (v) => {
       host.settings.stadium = v;
