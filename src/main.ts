@@ -5,6 +5,7 @@ import './style.css';
 import './ui/ui.css';
 import { Game } from './game/game';
 import { onLangChange, t } from './i18n/i18n';
+import { showLoader } from './ui/loader';
 
 async function boot(): Promise<void> {
   const canvas = document.getElementById('game') as HTMLCanvasElement;
@@ -26,6 +27,14 @@ async function boot(): Promise<void> {
   const game = new Game(canvas, ui);
   setRotate();
   game.start();
+  // the opening show; the tap that closes it also unlocks the sound (iPhone)
+  showLoader({
+    onClose: () =>
+      window.setTimeout(() => {
+        game.audio.play('kickPerfect');
+        game.audio.play('goal', 0.55);
+      }, 90),
+  });
   if (import.meta.env.DEV) (window as unknown as { __game: Game }).__game = game;
 }
 
