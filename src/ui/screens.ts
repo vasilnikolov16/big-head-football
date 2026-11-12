@@ -22,6 +22,8 @@ export interface AppActions extends SettingsHost {
   showOnline(): void;
   showParty(): void;
   showShop(): void;
+  showLeague(): void;
+  showDaily(): void;
   startPvp(): void;
   rematch(): void;
   changeHeroes(): void;
@@ -76,6 +78,8 @@ export function mainMenu(app: AppActions): Screen {
   const list = h('div', 'menu-list');
   const items: NavItem[] = [
     button(t('menu.cpu'), () => app.showCpuSetup()),
+    button(t('menu.daily'), () => app.showDaily()),
+    button(t('menu.league'), () => app.showLeague()),
     button(t('menu.party'), () => app.showParty()),
     button(t('menu.shop'), () => app.showShop()),
     button(t('menu.online'), () => app.showOnline(), 'btn', false, '🌐'),

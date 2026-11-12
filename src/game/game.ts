@@ -10,6 +10,9 @@ import { Keyboard } from '../input/keyboard';
 import { MultiController, TouchControls } from '../input/touch';
 import { touchLayoutScreen } from '../ui/touchLayoutUi';
 import { partyScreen } from '../ui/partyUi';
+import { dailyScreen, leagueScreen } from '../ui/leagueUi';
+import { LEAGUE_WIN_COINS, newLeague, nextOpponent, playRound } from './league';
+import { dailyChallenge, dailyDone, todayKey, type DailyChallenge } from './daily';
 import { confirmScreen, shopScreen, type ShopTab } from '../ui/shopUi';
 import type { Screen as UIScreen } from '../ui/ui';
 import { PARTY_MODES, pickStadium, type MatchRules, type PartyMode, type StadiumId } from './stadiums';
@@ -378,6 +381,79 @@ export class Game implements AppActions {
     this.showHeroSelect('pvp');
   }
 
+  // ------------------------------------------------------------------ league
+
+  private leagueDiff: Difficulty = 'medium';
+
+  showLeague(): void {
+    if (this.setup?.mode !== 'demo') this.startDemo();
+    this.ui.show(
+      leagueScreen({
+        run: this.career.p.league,
+        difficulty: this.leagueDiff,
+        setDifficulty: (d) => (this.leagueDiff = d),
+        start: () =>
+          this.showHeroSelect(
+            'tournament',
+            (a) => {
+              this.career.p.league = newLeague(a.id, this.leagueDiff);
+              this.career.save();
+              this.showLeague();
+            },
+            () => this.showLeague(),
+          ),
+        play: () => this.playLeagueRound(),
+        abandon: () => {
+          this.career.p.league = null;
+          this.career.save();
+          this.showLeague();
+        },
+        back: () => this.showMain(),
+      }),
+    );
+  }
+
+  private playLeagueRound(): void {
+    const run = this.career.p.league;
+    if (!run || run.stage === 'done') return;
+    const opp = run.teams[nextOpponent(run)];
+    if (!opp) return;
+    this.ui.hide();
+    this.startMatch({
+      mode: 'league',
+      chars: [getCharacter(run.hero), getCharacter(opp.hero)],
+      difficulty: run.stage === 'season' ? run.difficulty : run.difficulty === 'easy' ? 'medium' : 'hard',
+      humanScheme: this.settings.humanScheme,
+      duration: this.settings.duration,
+      allowDraw: run.stage === 'season',
+    });
+  }
+
+  // ------------------------------------------------------------------ daily challenge
+
+  private daily: DailyChallenge | null = null;
+
+  showDaily(): void {
+    if (this.setup?.mode !== 'demo') this.startDemo();
+    this.ui.show(dailyScreen({ done: this.career.p.dailyDate === todayKey(), play: () => this.playDaily(), back: () => this.showMain() }));
+  }
+
+  private playDaily(): void {
+    const c = dailyChallenge();
+    this.daily = c;
+    this.ui.hide();
+    this.startMatch({
+      mode: 'daily',
+      chars: [getCharacter(c.hero), getCharacter(c.opponent)],
+      difficulty: c.difficulty,
+      humanScheme: this.settings.humanScheme,
+      duration: 60,
+      stadium: c.stadium,
+      rules: c.party ? PARTY_MODES[c.party].rules : undefined,
+      party: c.party ?? undefined,
+    });
+  }
+
   // ------------------------------------------------------------------ shop
 
   showShop(tab: ShopTab = 'ball'): void {
@@ -611,7 +687,9 @@ export class Game implements AppActions {
     this.postShown = true;
     const mode = this.setup.mode;
     let result: CareerResult | null = null;
+    let note = '';
     if (this.tracker) {
+      const summary = this.tracker.finish();
       result = this.career.record({
         mode,
         humans: mode === 'pvp' || this.setup.twoPlayers ? [0, 1] : [0],
@@ -619,8 +697,30 @@ export class Game implements AppActions {
         party: this.setup.party,
         heroes: [this.setup.chars[0].id, this.setup.chars[1].id],
         difficulty: this.setup.difficulty,
-        summary: this.tracker.finish(),
+        summary,
       });
+      // league: the round is played; daily challenge: was it done?
+      if (mode === 'league' && this.career.p.league) {
+        const run = this.career.p.league;
+        const before = run.stage;
+        playRound(run, summary.score[0], summary.score[1], summary.winner === 0);
+        if (run.stage === 'done' && run.champion) {
+          const r2 = this.career.winLeague(LEAGUE_WIN_COINS);
+          result.coins += r2.coins;
+          result.achievements.push(...r2.achievements);
+          note = t('league.wonNote', { n: LEAGUE_WIN_COINS });
+        } else if (run.stage === 'done') note = before === 'season' ? t('league.outNote') : t('league.lostNote');
+        else if (run.stage !== before) note = run.stage === 'semi' ? t('league.toSemi') : t('league.toFinal');
+        this.career.save();
+      }
+      if (mode === 'daily' && this.daily) {
+        if (dailyDone(this.daily, summary)) {
+          const r2 = this.career.completeDaily(this.daily.date, this.daily.reward);
+          result.coins += r2.coins;
+          result.achievements.push(...r2.achievements);
+          note = r2.coins > 0 ? t('daily.success', { n: r2.coins }) : t('daily.successAgain');
+        } else note = t('daily.fail');
+      }
       for (const a of result.achievements) this.toaster.show(a.icon, t('ach.unlocked'), tr(a.name));
       for (const id of result.unlockedHeroes) this.toaster.show('🔓', t('tour.unlocked', { h: tr(getCharacter(id).name) }), '');
     }
@@ -629,7 +729,24 @@ export class Game implements AppActions {
       postMatch(this, m, mode, {
         career: r,
         vsCpu: !(mode === 'pvp' || this.setup.twoPlayers),
+        note,
+        continueOnly: mode === 'league' || mode === 'daily',
         onContinue: () => {
+          if (mode === 'league') {
+            const run = this.career.p.league;
+            const hero = this.setup.chars[0].id;
+            this.startDemo();
+            if (run?.stage === 'done' && run.champion) {
+              this.ui.show(trophyScreen(hero, false, [], () => this.showLeague()));
+              this.audio.play('goal');
+            } else this.showLeague();
+            return;
+          }
+          if (mode === 'daily') {
+            this.startDemo();
+            this.showDaily();
+            return;
+          }
           if (r?.cupWon) {
             const hero = this.setup.chars[0].id; // read before the demo match replaces the setup
             this.startDemo();

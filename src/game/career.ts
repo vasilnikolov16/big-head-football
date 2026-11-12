@@ -164,6 +164,28 @@ export class Career {
     return true;
   }
 
+  /** the daily challenge was completed (once per day) */
+  completeDaily(date: string, reward: number): { coins: number; achievements: Achievement[] } {
+    if (this.p.dailyDate === date) return { coins: 0, achievements: [] };
+    this.p.dailyDate = date;
+    this.p.stats.dailyDone++;
+    const out: Achievement[] = [];
+    if (this.p.stats.dailyDone >= 5) this.award('daily_hero', out);
+    const coins = reward + this.pendingCoins;
+    out.push(...this.addCoins(reward));
+    return { coins, achievements: out };
+  }
+
+  /** the league was won */
+  winLeague(reward: number): { coins: number; achievements: Achievement[] } {
+    this.p.stats.leaguesWon++;
+    const out: Achievement[] = [];
+    this.award('league_champ', out);
+    const coins = reward + this.pendingCoins;
+    out.push(...this.addCoins(reward));
+    return { coins, achievements: out };
+  }
+
   equip(cat: CosCat, id: string): void {
     if (!this.owns(cat, id)) return;
     this.p.equipped[cat] = id;
