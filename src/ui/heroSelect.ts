@@ -1,6 +1,6 @@
 import { CHARACTERS, type CharacterDef } from '../game/characters';
 import { Player } from '../game/player';
-import { SUPER_INFO } from '../game/supers';
+import { SUPER_HIT, SUPER_INFO } from '../game/supers';
 import { t, tr } from '../i18n/i18n';
 import { keyLabel, type MenuKeys } from '../input/controls';
 import { drawHead, drawPlayer } from '../render/playerDraw';
@@ -230,7 +230,13 @@ export function heroSelect(o: HeroSelectOptions): Screen {
       // the other online player has their own unlocks
       const locked = online && i === them ? false : o.isLocked(c);
       s.name.textContent = hiddenRight ? (tour ? t('tour.title') : '???') : tr(c.name);
-      s.tagline.textContent = hiddenRight ? (tour ? '' : t('sel.firstPick')) : locked ? '🔒 ' + t('sel.locked') : tr(c.tagline);
+      s.tagline.textContent = hiddenRight
+        ? tour
+          ? ''
+          : t('sel.firstPick')
+        : locked
+          ? '🔒 ' + (c.unlock === 'shop' ? t('sel.lockedShop', { n: c.price ?? 0 }) : t('sel.locked'))
+          : tr(c.tagline);
       s.root.classList.toggle('locked', !hiddenRight && locked);
       STAT_LABELS.forEach(([key], k) => {
         const v = c.stats[key];
@@ -239,7 +245,7 @@ export function heroSelect(o: HeroSelectOptions): Screen {
       const sup = SUPER_INFO[c.super];
       s.superName.textContent = hiddenRight ? '—' : tr(sup.name);
       s.superName.style.color = sup.color;
-      s.superDesc.textContent = hiddenRight ? '' : tr(sup.desc);
+      s.superDesc.textContent = hiddenRight ? '' : `${tr(sup.desc)} ${tr(SUPER_HIT[c.super])}`;
       s.root.style.setProperty('--hero', c.look.shirt === '#ffffff' ? '#e63946' : c.look.shirt);
       s.readyBtn.textContent = ready[i] ? t('sel.change') : t('sel.ready');
       s.readyBtn.classList.toggle('btn-alt', ready[i]);
@@ -474,8 +480,8 @@ export function heroSelect(o: HeroSelectOptions): Screen {
       const k = cv.width / 104;
       g.setTransform(1, 0, 0, 1, 0, 0);
       g.clearRect(0, 0, cv.width, cv.height);
-      g.setTransform(k, 0, 0, k, 52 * k, 56 * k);
-      drawHead(g, portrait, 30, 1, time);
+      g.setTransform(k, 0, 0, k, 52 * k, 60 * k);
+      drawHead(g, portrait, 27, 1, time);
     });
     raf = requestAnimationFrame(frame);
   };

@@ -32,6 +32,10 @@ interface PlayerSnap {
   blink: number;
   dashT: number;
   dashDir: number;
+  slowT: number;
+  noJumpT: number;
+  shrinkT: number;
+  burnT: number;
 }
 
 interface Snap {
@@ -74,6 +78,10 @@ const snapPlayer = (p: Player, out?: PlayerSnap): PlayerSnap => {
   s.blink = p.blink;
   s.dashT = p.dashT;
   s.dashDir = p.dashDir;
+  s.slowT = p.slowT;
+  s.noJumpT = p.noJumpT;
+  s.shrinkT = p.shrinkT;
+  s.burnT = p.burnT;
   return s;
 };
 
@@ -258,6 +266,10 @@ export class ReplayPlayer {
       g.blink = sb.blink;
       g.dashT = sb.dashT;
       g.dashDir = sb.dashDir;
+      g.slowT = sb.slowT;
+      g.noJumpT = sb.noJumpT;
+      g.shrinkT = sb.shrinkT;
+      g.burnT = sb.burnT;
     }
     if (v.arena.goalTop[0] !== b.goalTop[0]) v.arena.setGoalTop(0, b.goalTop[0]);
     if (v.arena.goalTop[1] !== b.goalTop[1]) v.arena.setGoalTop(1, b.goalTop[1]);

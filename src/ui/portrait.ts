@@ -17,8 +17,8 @@ export function heroPortrait(def: CharacterDef, size: number, opts: { silhouette
   p.lookX = 0.5;
   p.lookY = 0.1;
   if (opts.happy) p.expr = 'happy';
-  g.setTransform(dpr, 0, 0, dpr, (size / 2) * dpr, size * 0.56 * dpr);
-  drawHead(g, p, size * 0.3, 1, 1);
+  g.setTransform(dpr, 0, 0, dpr, (size / 2) * dpr, size * 0.6 * dpr);
+  drawHead(g, p, size * 0.27, 1, 1);
   if (opts.silhouette) {
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.globalCompositeOperation = 'source-atop';

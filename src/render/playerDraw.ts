@@ -237,6 +237,30 @@ export function drawPlayer(ctx: CanvasRenderingContext2D, p: Player, alpha: numb
 function drawStatus(ctx: CanvasRenderingContext2D, p: Player, t: number): void {
   const R = p.headR;
   const feet = p.y - p.headY; // distance head centre -> feet
+  // effects of a blocked super shot: little badges above the head
+  const badges: string[] = [];
+  if (p.slowT > 0) badges.push('🐌');
+  if (p.noJumpT > 0) badges.push('🐸');
+  if (p.burnT > 0) badges.push('🔥');
+  if (p.shrinkT > 0) badges.push('💫');
+  if (badges.length) {
+    ctx.save();
+    ctx.font = `${Math.round(Math.max(18, R * 0.5))}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    badges.forEach((b, i) => ctx.fillText(b, (i - (badges.length - 1) / 2) * 28, -R - 34 + Math.sin(t * 5 + i) * 3));
+    ctx.restore();
+  }
+  if (p.burnT > 0) {
+    // smoke rising off a burned head
+    for (let i = 0; i < 3; i++) {
+      const k = (t * 1.2 + i / 3) % 1;
+      ctx.fillStyle = `rgba(70,70,80,${0.45 * (1 - k)})`;
+      ctx.beginPath();
+      ctx.arc((i - 1) * R * 0.4 + Math.sin(t * 3 + i) * 4, -R * 0.8 - k * 40, 6 + k * 10, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
   if (p.frozenT > 0) {
     // ice block
     ctx.save();

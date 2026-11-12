@@ -23,12 +23,29 @@ export type Sfx =
   | 'freeze'
   | 'superArmed'
   | 'superHit'
+  | 'superBlock'
   | 'uiMove'
   | 'uiSelect'
   | 'uiBack'
   | 'countdown';
 
-export type SuperSfx = 'razor' | 'pounce' | 'laser' | 'sonic' | 'yarn' | 'warp' | 'thunder' | 'shadow';
+export type SuperSfx =
+  | 'razor'
+  | 'pounce'
+  | 'laser'
+  | 'sonic'
+  | 'yarn'
+  | 'warp'
+  | 'thunder'
+  | 'shadow'
+  | 'pan'
+  | 'bats'
+  | 'hose'
+  | 'avalanche'
+  | 'cannon'
+  | 'hook'
+  | 'magic'
+  | 'roar';
 
 export class AudioEngine {
   ctx: AudioContext | null = null;
@@ -378,6 +395,12 @@ export class AudioEngine {
         this.tone('sawtooth', 180, 900, t, 0.45, 0.12);
         this.noiseHit(t, 0.4, 0.15, 'bandpass', 400, 3000, 2);
         break;
+      case 'superBlock':
+        // a heavy deflection
+        this.tone('sine', 150, 60, t, 0.2, 0.7 * k, this.sfxBus, 0.001);
+        this.tone('triangle', 1100, 320, t, 0.18, 0.18 * k);
+        this.noiseHit(t, 0.12, 0.45 * k, 'bandpass', 2400, 800, 1.2);
+        break;
       case 'superHit':
         this.tone('square', 600, 200, t, 0.15, 0.2);
         // little birdies
@@ -504,6 +527,33 @@ export class AudioEngine {
         this.noiseHit(t, 0.3, 0.3, 'bandpass', 3000, 8000, 6);
         this.tone('triangle', 2600, 3300, t, 0.3, 0.07);
         break;
+      case 'pan': // sizzle and a clang of the pan
+        this.noiseHit(t, 0.45, 0.2, 'highpass', 4000, 6000, 1);
+        for (const r of [1, 2.7, 5.1]) this.tone('sine', 620 * r, 610 * r, t, 0.4 / r, 0.12 / r);
+        break;
+      case 'bats': // squeaks
+        [0, 0.09, 0.2].forEach((d, i) => this.tone('sine', 3400 + i * 300, 4200 + i * 200, t + d, 0.05, 0.07));
+        break;
+      case 'hose': // a spray of water
+        this.noiseHit(t, 0.4, 0.22, 'bandpass', 2500, 1800, 0.8, this.sfxBus, 0.03);
+        break;
+      case 'avalanche': // icy chime
+        [1568, 2093, 2637].forEach((fr, i) => this.tone('sine', fr, fr, t + i * 0.06, 0.4, 0.07, this.sfxBus, 0.002));
+        break;
+      case 'cannon': // "arr!" growl
+        this.tone('sawtooth', 160, 110, t, 0.35, 0.12);
+        this.noiseHit(t, 0.3, 0.12, 'lowpass', 500);
+        break;
+      case 'hook': // the boxing bell
+        for (const d of [0, 0.18]) for (const r of [1, 2.4, 3.9]) this.tone('sine', 1250 * r, 1240 * r, t + d, 0.5 / r, 0.1 / r, this.sfxBus, 0.001);
+        break;
+      case 'magic': // sparkles going up
+        [1047, 1319, 1568, 2093, 2637].forEach((fr, i) => this.tone('sine', fr, fr, t + i * 0.045, 0.25, 0.06, this.sfxBus, 0.002));
+        break;
+      case 'roar': // a low growl
+        this.tone('sawtooth', 95, 75, t, 0.45, 0.13);
+        this.noiseHit(t, 0.45, 0.2, 'lowpass', 400, 250);
+        break;
     }
   }
 
@@ -542,6 +592,33 @@ export class AudioEngine {
       case 'shadow': // wind and taiko drums
         this.noiseHit(t, D, 0.18, 'bandpass', 700, 2200, 2, this.sfxBus, 0.4);
         for (const d of [0, 0.4, 0.7, 0.88]) this.drum('kick', t + d, 0.7, this.sfxBus);
+        break;
+      case 'pan': // sizzling louder and louder
+        this.noiseHit(t, D, 0.3, 'highpass', 3500, 6500, 1, this.sfxBus, D * 0.8);
+        break;
+      case 'bats': // flapping wings and squeaks
+        for (let i = 0; i < 8; i++) this.noiseHit(t + i * 0.12, 0.06, 0.18, 'bandpass', 900, 600, 1.5);
+        [0.3, 0.65, 0.9].forEach((d) => this.tone('sine', 3800, 4600, t + d, 0.05, 0.06));
+        break;
+      case 'hose': // pressure building up
+        this.noiseHit(t, D, 0.22, 'bandpass', 400, 2600, 1.2, this.sfxBus, D * 0.9);
+        break;
+      case 'avalanche': // rumbling snow and crunches
+        this.noiseHit(t, D, 0.3, 'lowpass', 200, 500, 1, this.sfxBus, 0.3);
+        for (const d of [0.2, 0.5, 0.75]) this.noiseHit(t + d, 0.08, 0.2, 'bandpass', 1800, 1200, 2);
+        break;
+      case 'cannon': // the fuse burning
+        for (let i = 0; i < 14; i++) this.noiseHit(t + i * 0.065 + Math.random() * 0.02, 0.03, 0.12, 'highpass', 5000);
+        break;
+      case 'hook': // three punches on the bag
+        for (const d of [0.15, 0.45, 0.72]) this.tone('sine', 110, 55, t + d, 0.1, 0.5, this.sfxBus, 0.001);
+        break;
+      case 'magic': // mystic shimmer
+        for (let i = 0; i < 6; i++) this.tone('sine', 1760 + i * 220, 1980 + i * 220, t + i * 0.13, 0.3, 0.05, this.sfxBus, 0.05);
+        break;
+      case 'roar': // stomps and a growing growl
+        for (const d of [0, 0.35, 0.65]) this.drum('kick', t + d, 0.9, this.sfxBus);
+        this.tone('sawtooth', 70, 120, t + 0.2, 0.8, 0.12, this.sfxBus, 0.6);
         break;
     }
   }
@@ -599,6 +676,38 @@ export class AudioEngine {
         break;
       case 'shadow':
         [0, 0.08, 0.16].forEach((d) => this.noiseHit(t + d, 0.25, 0.3, 'bandpass', 600, 2400, 2));
+        break;
+      case 'pan':
+        for (const r of [1, 2.7, 5.1]) this.tone('sine', 520 * r, 515 * r, t, 0.7 / r, 0.25 / r, this.sfxBus, 0.001);
+        this.noiseHit(t, 0.5, 0.25, 'highpass', 4000);
+        break;
+      case 'bats':
+        this.tone('sawtooth', 2600, 1200, t, 0.35, 0.1);
+        this.noiseHit(t, 0.4, 0.2, 'bandpass', 900, 2500, 1.5);
+        break;
+      case 'hose':
+        this.noiseHit(t, 0.9, 0.45, 'bandpass', 2200, 1200, 0.7, this.sfxBus, 0.01);
+        this.noiseHit(t, 0.6, 0.25, 'lowpass', 600);
+        break;
+      case 'avalanche':
+        this.noiseHit(t, 0.7, 0.5, 'lowpass', 600, 200);
+        [2637, 3136].forEach((fr) => this.tone('sine', fr, fr * 0.98, t, 0.5, 0.06));
+        break;
+      case 'cannon':
+        this.tone('sine', 70, 28, t, 0.7, 1, this.sfxBus, 0.002);
+        this.noiseHit(t, 0.7, 0.6, 'lowpass', 900, 150);
+        break;
+      case 'hook':
+        this.tone('sine', 130, 45, t, 0.25, 0.9, this.sfxBus, 0.001);
+        this.noiseHit(t, 0.08, 0.6, 'bandpass', 1500, 700, 1);
+        break;
+      case 'magic':
+        this.tone('sine', 400, 2400, t, 0.25, 0.18);
+        [2093, 2637, 3136].forEach((fr, i) => this.tone('sine', fr, fr, t + 0.1 + i * 0.05, 0.4, 0.06, this.sfxBus, 0.002));
+        break;
+      case 'roar':
+        this.tone('sawtooth', 130, 65, t, 0.9, 0.22, this.sfxBus, 0.05);
+        this.noiseHit(t, 0.9, 0.4, 'bandpass', 500, 250, 0.8, this.sfxBus, 0.05);
         break;
     }
   }

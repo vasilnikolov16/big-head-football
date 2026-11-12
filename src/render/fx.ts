@@ -126,6 +126,14 @@ export class Fx {
         this.particles.sparks(p.x, p.y - 40, 18, color, 500);
         this.addShake(4);
       }),
+      ev.on('superBlocked', (e) => {
+        const color = SUPER_INFO[e.id as keyof typeof SUPER_INFO]?.color ?? '#ffffff';
+        this.addShake(9);
+        this.hitStop = Math.max(this.hitStop, 0.06);
+        this.particles.sparks(e.x, e.y, 26, color, 750);
+        this.particles.stars(e.x, e.y, 8, '#ffffff');
+        st.excitement = Math.max(st.excitement, 0.8);
+      }),
       ev.on('superHit', (e) => {
         this.addShake(6);
         this.particles.stars(e.x, e.y, 6, '#ffe14d');

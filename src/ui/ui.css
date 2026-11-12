@@ -1998,3 +1998,17 @@ canvas {
   -webkit-user-select: none;
   user-select: none;
 }
+
+/* 16 heroes: a 4×4 grid of smaller cards */
+.sel-grid {
+  grid-template-columns: repeat(4, 100px);
+  grid-auto-rows: 104px;
+  gap: 10px;
+}
+.sel-grid .hero-portrait {
+  width: 84px;
+  height: 78px;
+}
+.sel-grid .hero-name {
+  font-size: 13px;
+}

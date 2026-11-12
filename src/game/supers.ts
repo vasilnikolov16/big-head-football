@@ -19,6 +19,34 @@ export const SUPER_INFO: Record<SuperId, SuperInfo> = {
   warp: { name: { bg: 'Телепорт', en: 'Teleport' }, desc: { bg: 'Топката изчезва и се появява точно пред чуждата врата.', en: 'The ball vanishes and reappears right in front of the goal.' }, color: '#9dff5c' },
   thunder: { name: { bg: 'Гръм', en: 'Thunder' }, desc: { bg: 'Топката излита до небето и се забива като мълния.', en: 'The ball flies to the sky and strikes down like lightning.' }, color: '#ffe14d' },
   shadow: { name: { bg: 'Сенки', en: 'Shadow Clones' }, desc: { bg: 'Три еднакви топки — само една е истинска.', en: 'Three identical balls — only one is real.' }, color: '#b8a9ff' },
+  pan: { name: { bg: 'Горещ тиган', en: 'Hot Pan' }, desc: { bg: 'Палачинката полита, обръща се във въздуха и се забива във вратата.', en: 'The pancake flies up, flips in the air and slams into the goal.' }, color: '#ff9f1c' },
+  bats: { name: { bg: 'Ято прилепи', en: 'Bat Swarm' }, desc: { bg: 'Топката лети на зигзаг като прилеп.', en: 'The ball zigzags like a bat.' }, color: '#9d4edd' },
+  hose: { name: { bg: 'Воден маркуч', en: 'Fire Hose' }, desc: { bg: 'Ниска водна струя право към долния ъгъл.', en: 'A low water jet straight to the bottom corner.' }, color: '#4cc9f0' },
+  avalanche: { name: { bg: 'Лавина', en: 'Avalanche' }, desc: { bg: 'Снежна топка, която расте, докато се търкаля.', en: 'A snowball that grows as it rolls.' }, color: '#cfe8ff' },
+  cannon: { name: { bg: 'Гюле', en: 'Cannonball' }, desc: { bg: 'Висока дъга и експлозия при падането.', en: 'A high arc and a blast where it lands.' }, color: '#8d99ae' },
+  hook: { name: { bg: 'Кроше', en: 'Hook Shot' }, desc: { bg: 'Излита нагоре и завива рязко към вратата.', en: 'Flies up, then curls sharply into the goal.' }, color: '#ff4d4d' },
+  magic: { name: { bg: 'Звездна магия', en: 'Star Magic' }, desc: { bg: 'Топката скача през пространството на три пъти.', en: 'The ball blinks through space three times.' }, color: '#ffd60a' },
+  roar: { name: { bg: 'Рев', en: 'Roar' }, desc: { bg: 'Ударна вълна по земята изхвърля противника, а топката минава отдолу.', en: 'A ground shockwave throws the opponent up while the ball skims below.' }, color: '#80ed99' },
+};
+
+/** What happens to a player who blocks (or is caught by) each super shot. */
+export const SUPER_HIT: Record<SuperId, { bg: string; en: string }> = {
+  razor: { bg: 'Който го спре, отхвърча назад.', en: 'Whoever blocks it is knocked back.' },
+  pounce: { bg: 'Който го спре, е издраскан и замаян.', en: 'Whoever blocks it gets scratched and dazed.' },
+  laser: { bg: 'Който го спре, получава ток и замръзва на място.', en: 'Whoever blocks it is shocked stiff.' },
+  sonic: { bg: 'Който го чуе отблизо, оглушава и бърка посоките.', en: 'Hearing it up close deafens you: controls reversed.' },
+  yarn: { bg: 'Който го спре, се оплита и едва се движи.', en: 'Whoever blocks it gets tangled up and slowed.' },
+  warp: { bg: 'Който го спре, бива отвлечен нагоре.', en: 'Whoever blocks it gets beamed up.' },
+  thunder: { bg: 'Мълнията и ударната вълна зашеметяват.', en: 'The lightning and the shockwave stun.' },
+  shadow: { bg: 'Който го спре, се забавя в облак дим.', en: 'Whoever blocks it is slowed in a cloud of smoke.' },
+  pan: { bg: 'Който го спре, се опарва.', en: 'Whoever blocks it gets burned.' },
+  bats: { bg: 'Който го спре, губи сила и супер енергия.', en: 'Whoever blocks it is drained of strength and super energy.' },
+  hose: { bg: 'Който го спре, бива отнесен от струята.', en: 'Whoever blocks it is washed away.' },
+  avalanche: { bg: 'Който го спре, замръзва.', en: 'Whoever blocks it freezes.' },
+  cannon: { bg: 'Взривът смачква главата на противника.', en: 'The blast squashes the opponent’s head.' },
+  hook: { bg: 'Който го спре, е в нокдаун: посоките се объркват.', en: 'Whoever blocks it is knocked silly: controls reversed.' },
+  magic: { bg: 'Който го спре, става на жаба и не може да скача.', en: 'Whoever blocks it turns into a frog and can’t jump.' },
+  roar: { bg: 'Ударната вълна изхвърля противника във въздуха.', en: 'The shockwave throws the opponent into the air.' },
 };
 
 /** Seconds the game freezes while the hero winds up the super shot. */
@@ -58,6 +86,8 @@ export class SuperShot {
   ty: number;
   private y0 = 0;
   private x0 = 0;
+  private r0 = 0;
+  private waveAt = 0;
   private fromX = 0;
   private fromY = 0;
   private holdX = 0;
@@ -150,8 +180,8 @@ export class SuperShot {
       case 'yarn':
         this.passThrough = true;
         b.gravityScale = 0.25;
-        b.vx = this.dir * 600;
-        b.vy = -680;
+        b.vx = this.dir * 650;
+        b.vy = -420;
         break;
       case 'warp':
         b.gravityScale = 0;
@@ -168,7 +198,64 @@ export class SuperShot {
         b.vx = this.dir * 150;
         b.vy = -1600;
         break;
+      case 'pan':
+        b.gravityScale = 0;
+        b.vx = this.dir * 260;
+        b.vy = -1250;
+        break;
+      case 'bats':
+        b.gravityScale = 0;
+        this.ty = this.bestAimY(m);
+        break;
+      case 'hose':
+        b.gravityScale = 0;
+        b.spin = 0;
+        this.aim(m, 1900);
+        this.ty = GROUND_Y - 40;
+        this.aimAt(m, 1900, this.ty);
+        break;
+      case 'avalanche':
+        b.gravityScale = 0;
+        this.r0 = b.r;
+        b.vx = this.dir * 300;
+        b.vy = 1100;
+        break;
+      case 'cannon': {
+        b.gravityScale = 1;
+        b.spin = this.dir * 8;
+        const T = 1.15;
+        const side = this.owner === 0 ? 1 : 0;
+        const ty = (m.arena.goalTop[side] + GROUND_Y) / 2;
+        b.vx = (this.tx - b.x) / T;
+        b.vy = (ty - b.y - 0.5 * BALL_GRAVITY * T * T) / T;
+        break;
+      }
+      case 'hook':
+        b.gravityScale = 0;
+        b.vx = this.dir * 950;
+        b.vy = -1100;
+        break;
+      case 'magic':
+        b.gravityScale = 0;
+        b.vx = 0;
+        b.vy = -120;
+        break;
+      case 'roar':
+        b.gravityScale = 0;
+        b.vx = this.dir * 1250;
+        this.waveAt = -1;
+        break;
     }
+  }
+
+  /** straight line to a given height in the goal mouth */
+  private aimAt(m: Match, speed: number, ty: number): void {
+    const b = m.ball;
+    const dx = this.tx - b.x;
+    const dy = ty - b.y;
+    const d = Math.hypot(dx, dy) || 1;
+    b.vx = (dx / d) * speed;
+    b.vy = (dy / d) * speed;
   }
 
   /** Ninja: the ball splits into three identical balls. */
@@ -224,7 +311,7 @@ export class SuperShot {
   private bestAimY(m: Match): number {
     const b = m.ball;
     const side = this.owner === 0 ? 1 : 0;
-    const top = m.arena.goalTop[side] + 26;
+    const top = m.arena.goalTop[side] + b.r + 16; // clear of the crossbar
     const bottom = GROUND_Y - 26;
     const opp = m.players[1 - this.owner];
     const shapes = [
@@ -307,10 +394,7 @@ export class SuperShot {
         b.vy = Math.max(-1400, Math.min(1400, (want - b.y) / dt));
         // the sound wave stuns the opponent when it passes nearby
         const opp = m.players[1 - this.owner];
-        if (!this.hitOpponent && Math.abs(opp.headX - b.x) < 150 && Math.abs(opp.headY - b.y) < 190) {
-          this.stun(m, opp, 1.1);
-          this.passThrough = true;
-        }
+        if (!this.hitOpponent && Math.abs(opp.headX - b.x) < 150 && Math.abs(opp.headY - b.y) < 190) this.hitEffect(m, opp);
         if (t > 1.8) this.finish(m);
         break;
       }
@@ -319,7 +403,7 @@ export class SuperShot {
           const dx = this.tx - b.x;
           const dy = this.ty - b.y;
           const d = Math.hypot(dx, dy) || 1;
-          const k = Math.min(1, dt * 3.4);
+          const k = Math.min(1, dt * 4.6);
           b.vx += ((dx / d) * 1150 - b.vx) * k;
           b.vy += ((dy / d) * 1150 - b.vy) * k;
         }
@@ -370,6 +454,99 @@ export class SuperShot {
         }
         if (t > 1.8) this.finish(m);
         break;
+      case 'pan':
+        if (this.phase === 0 && (t > 0.32 || b.y < 150)) this.phase = 1;
+        if (this.phase === 1) {
+          // the pancake flips in the air
+          b.vx = b.vy = 0;
+          if (t > 0.56) {
+            this.phase = 2;
+            this.aim(m, 1750);
+          }
+        } else if (this.phase === 2) {
+          this.keepSpeed(m, 1750);
+          if (t > 2) this.finish(m);
+        }
+        break;
+      case 'bats': {
+        // zigzag along the line to the goal
+        const total = Math.abs(this.tx - this.x0) / 1150;
+        const k = Math.min(1, t / Math.max(0.2, total));
+        const wantX = this.x0 + (this.tx - this.x0) * k;
+        // the zigzag is widest mid-flight and calms down at both ends (no scraping the floor or the bar)
+        const wantY = Math.max(140, Math.min(GROUND_Y - b.r - 12, this.y0 + (this.ty - this.y0) * k + Math.sin(t * 10) * 120 * Math.sin(Math.PI * k)));
+        b.vx = Math.max(-2200, Math.min(2200, (wantX - b.x) / dt));
+        b.vy = Math.max(-2200, Math.min(2200, (wantY - b.y) / dt));
+        if (t > 2) this.finish(m);
+        break;
+      }
+      case 'hose':
+        this.keepSpeed(m, 1900);
+        if (t > 1.3) this.finish(m);
+        break;
+      case 'avalanche':
+        if (this.phase === 0 && (b.y >= GROUND_Y - b.r - 2 || t > 0.4)) this.phase = 1;
+        if (this.phase === 1) {
+          b.r = this.r0 * Math.min(1.9, 1 + t * 0.9);
+          b.vx = this.dir * 1000;
+          b.vy = 0;
+          b.y = GROUND_Y - b.r;
+          b.spin = this.dir * 40;
+        }
+        if (t > 2.3) this.finish(m);
+        break;
+      case 'cannon':
+        if (t > 2.4) this.finish(m);
+        break;
+      case 'hook':
+        if (t > 0.3) {
+          // curl down in front of the goal first, then straight in under the crossbar
+          const before = (b.x - (this.tx - this.dir * 170)) * this.dir < 0;
+          const dx = (before ? this.tx - this.dir * 170 : this.tx) - b.x;
+          const dy = (before ? GROUND_Y - 110 : GROUND_Y - 80) - b.y;
+          const d = Math.hypot(dx, dy) || 1;
+          const k = Math.min(1, dt * 12);
+          b.vx += ((dx / d) * 2100 - b.vx) * k;
+          b.vy += ((dy / d) * 2100 - b.vy) * k;
+        }
+        if (t > 1.6) this.finish(m);
+        break;
+      case 'magic': {
+        const hop = this.phase;
+        if (hop < 3 && t > 0.16 + hop * 0.2) {
+          // blink forward towards the goal
+          this.phase = hop + 1;
+          const nx = b.x + (this.tx - b.x) * 0.3;
+          const ny = b.y + (this.ty - b.y) * 0.3 - 40;
+          b.x = b.px = nx;
+          b.y = b.py = ny;
+          b.vx = b.vy = 0;
+        } else if (hop < 3) {
+          b.vx = b.vy = 0;
+        } else if (hop === 3) {
+          this.phase = 4;
+          this.aim(m, 1700);
+        } else this.keepSpeed(m, 1700);
+        if (t > 2) this.finish(m);
+        break;
+      }
+      case 'roar': {
+        // the ball skims low behind a shockwave running along the ground
+        const wantY = GROUND_Y - b.r - 6;
+        b.vx = this.dir * 1250;
+        b.vy = Math.max(-1200, Math.min(1200, (wantY - b.y) / Math.max(dt, 0.02)));
+        const waveX = this.x0 + this.dir * 1450 * t;
+        if (t - this.waveAt >= 0.1 || this.waveAt > t) {
+          this.waveAt = t;
+          m.shockwave = { x: Math.max(20, Math.min(W - 20, waveX)), t: 0 };
+        }
+        const opp = m.players[1 - this.owner];
+        if (!this.hitOpponent && opp.grounded && Math.abs(opp.x - waveX) < 70) {
+          this.hitEffect(m, opp);
+        }
+        if (t > 1.6) this.finish(m);
+        break;
+      }
     }
   }
 
@@ -386,6 +563,19 @@ export class SuperShot {
     if (this.id === 'warp' && this.phase < 2) return;
     if (this.id === 'yarn' && this.t < 0.2) return;
     if ((this.id === 'laser' || this.id === 'shadow') && this.phase < 2) return;
+    if (this.id === 'pan' && this.phase < 2) return;
+    if (this.id === 'avalanche' && imp.ground > 0 && imp.wall === 0 && imp.bar === 0) return;
+    if (this.id === 'roar' && imp.ground > 0 && imp.wall === 0 && imp.bar === 0) return;
+    if (this.id === 'magic' && this.phase < 4) return;
+    if (this.id === 'hook' && this.t < 0.3) return;
+    if (this.id === 'bats' && imp.wall === 0 && imp.bar === 0) return;
+    if (this.id === 'cannon') {
+      // the cannonball explodes where it lands
+      const opp = m.players[1 - this.owner];
+      if (Math.abs(opp.x - m.ball.x) < 240 && !this.hitOpponent) this.hitEffect(m, opp);
+      m.shockwave = { x: m.ball.x, t: 0 };
+      m.events.emit('superHit', { player: opp.index, x: m.ball.x, y: m.ball.y });
+    }
     if (this.id === 'thunder' && imp.ground > 0) {
       // shockwave on landing
       const opp = m.players[1 - this.owner];
@@ -403,19 +593,94 @@ export class SuperShot {
   ignores(m: Match, p: Player, overlapping: boolean): boolean {
     if (this.hidden || this.phase === -1) return true;
     if (p.index === this.owner) return this.t < 0.25; // don't instantly re-touch your own shot
-    if (!this.passThrough) return false;
-    if (overlapping && !this.hitOpponent) {
-      if (this.id === 'razor') {
-        p.vx = this.dir * 650;
+    void overlapping;
+    void m;
+    // every super can be blocked by the opponent (who pays for it: see hitEffect)
+    return false;
+  }
+
+  /** The opponent blocked the shot (or was caught by its wave / blast): the hero's own effect. */
+  hitEffect(m: Match, p: Player): void {
+    if (this.hitOpponent) return;
+    const d = this.dir;
+    switch (this.id) {
+      case 'razor':
+        p.vx = d * 650;
         p.vy = -380;
         p.grounded = false;
         this.stun(m, p, 0.7);
-      } else if (this.id === 'yarn') {
-        this.stun(m, p, 1.5);
+        break;
+      case 'pounce':
+        this.stun(m, p, 0.85);
+        break;
+      case 'laser':
+        p.vx = 0;
+        this.stun(m, p, 1.1);
+        break;
+      case 'sonic':
+        p.reversedT = Math.max(p.reversedT, 2.2);
+        this.stun(m, p, 0.35);
+        break;
+      case 'yarn':
+        p.slowT = Math.max(p.slowT, 2.5);
         p.vx *= 0.2;
-      }
+        this.stun(m, p, 0.6);
+        break;
+      case 'warp':
+        p.vy = -950;
+        p.grounded = false;
+        this.stun(m, p, 0.7);
+        break;
+      case 'thunder':
+        this.stun(m, p, 1.2);
+        break;
+      case 'shadow':
+        p.slowT = Math.max(p.slowT, 2);
+        this.stun(m, p, 0.4);
+        break;
+      case 'pan':
+        p.burnT = Math.max(p.burnT, 2.2);
+        p.vy = -320;
+        p.grounded = false;
+        this.stun(m, p, 0.9);
+        break;
+      case 'bats':
+        p.slowT = Math.max(p.slowT, 2.5);
+        p.energy = 0;
+        m.players[this.owner].addEnergy(0.3);
+        this.stun(m, p, 0.3);
+        break;
+      case 'hose':
+        p.vx = d * 1100;
+        p.vy = -260;
+        p.grounded = false;
+        this.stun(m, p, 0.55);
+        break;
+      case 'avalanche':
+        p.frozenT = Math.max(p.frozenT, 1.6);
+        this.stun(m, p, 0.01);
+        break;
+      case 'cannon':
+        p.shrinkT = Math.max(p.shrinkT, 3.5);
+        p.vy = -500;
+        p.grounded = false;
+        this.stun(m, p, 0.5);
+        break;
+      case 'hook':
+        p.reversedT = Math.max(p.reversedT, 2.2);
+        p.vx = d * 420;
+        this.stun(m, p, 0.45);
+        break;
+      case 'magic':
+        p.noJumpT = Math.max(p.noJumpT, 3.5);
+        this.stun(m, p, 0.3);
+        break;
+      case 'roar':
+        p.vy = -720;
+        p.grounded = false;
+        this.stun(m, p, 0.9);
+        break;
     }
-    return true;
   }
 
   private stun(m: Match, p: Player, seconds: number): void {
@@ -429,6 +694,7 @@ export class SuperShot {
     if (this.done) return;
     this.done = true;
     this.hidden = false;
+    if (this.id === 'avalanche' && this.r0 > 0) m.ball.r = this.r0;
     m.ball.gravityScale = 1;
     m.ball.dragScale = 1;
   }

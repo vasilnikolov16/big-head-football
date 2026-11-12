@@ -163,12 +163,60 @@ export class SuperFx {
         this.streak(ctx, tr, color, 3);
         break;
       case 'razor':
+      case 'pan':
         this.streak(ctx, tr, color, 2);
+        break;
+      case 'hose': {
+        this.streak(ctx, tr, '#4cc9f0', 1);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = 'rgba(205,240,255,0.85)';
+        for (let i = 0; i < tr.length; i += 2) {
+          const p = tr[i];
+          const k = i / tr.length;
+          ctx.beginPath();
+          ctx.arc(p.x + Math.sin(i * 12.9 + t * 20) * 14 * (1 - k), p.y + Math.cos(i * 78.2 + t * 17) * 12 * (1 - k), 2 + 3 * k, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        break;
+      }
+      case 'avalanche':
+        this.streak(ctx, tr, '#e8f4ff', 1);
+        break;
+      case 'cannon':
+        ctx.globalCompositeOperation = 'source-over';
+        for (let i = 0; i < tr.length; i += 2) {
+          const p = tr[i];
+          const k = i / tr.length;
+          ctx.fillStyle = `rgba(90,90,100,${0.35 * k})`;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 8 + (1 - k) * 14, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        break;
+      case 'magic':
+        this.streak(ctx, tr, color, 1);
+        ctx.fillStyle = '#fff6b0';
+        for (let i = 0; i < tr.length; i += 3) {
+          ctx.globalAlpha = i / tr.length;
+          this.star(ctx, tr[i].x + Math.sin(i * 3.1) * 16, tr[i].y + Math.cos(i * 2.3) * 16, 5);
+        }
+        ctx.globalAlpha = 1;
         break;
       default:
         this.streak(ctx, tr, color, 1);
     }
     ctx.restore();
+  }
+
+  private star(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 5;
+      const rr = i % 2 ? r * 0.45 : r;
+      ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+    }
+    ctx.closePath();
+    ctx.fill();
   }
 
   private streak(ctx: CanvasRenderingContext2D, tr: TrailPt[], color: string, lines: number): void {
@@ -218,6 +266,112 @@ export class SuperFx {
     if (s?.id === 'warp' && s.phase === 0) return clamp(1 - s.t / 0.22, 0.05, 1);
     if (s?.id === 'warp' && s.phase === 2) return clamp((s.t - 0.55) / 0.15, 0.1, 1);
     return 1;
+  }
+
+  /** What the ball turns into during the newer heroes' super shots. */
+  private drawSkin(ctx: CanvasRenderingContext2D, s: SuperShot, bx: number, by: number, r: number, t: number): void {
+    ctx.save();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 3;
+    switch (s.id) {
+      case 'pan': {
+        // a golden pancake flipping over
+        ctx.translate(bx, by);
+        ctx.scale(1, Math.max(0.25, Math.abs(Math.cos(t * 14))));
+        ctx.fillStyle = '#f4b860';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, r * 1.35, r * 1.1, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(160,90,20,0.55)';
+        for (const [x, y, rr] of [
+          [-0.4, -0.2, 0.18],
+          [0.3, 0.25, 0.14],
+          [0.35, -0.35, 0.1],
+        ]) {
+          ctx.beginPath();
+          ctx.arc(r * x, r * y, r * rr, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        break;
+      }
+      case 'bats': {
+        ctx.translate(bx, by);
+        const flap = Math.sin(t * 30) * 0.5;
+        ctx.fillStyle = '#2b1d3f';
+        ctx.lineWidth = 2.5;
+        for (const sd of [-1, 1]) {
+          ctx.save();
+          ctx.scale(sd, 1);
+          ctx.rotate(-flap);
+          ctx.beginPath();
+          ctx.moveTo(r * 0.6, -r * 0.2);
+          ctx.quadraticCurveTo(r * 1.6, -r * 1.4, r * 2.4, -r * 0.4);
+          ctx.quadraticCurveTo(r * 1.9, -r * 0.2, r * 1.8, r * 0.25);
+          ctx.quadraticCurveTo(r * 1.4, -r * 0.1, r * 1.2, r * 0.35);
+          ctx.quadraticCurveTo(r * 0.9, 0, r * 0.6, r * 0.2);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        }
+        break;
+      }
+      case 'avalanche': {
+        const g = ctx.createRadialGradient(bx - r * 0.3, by - r * 0.3, r * 0.2, bx, by, r);
+        g.addColorStop(0, '#ffffff');
+        g.addColorStop(1, '#bcd4ee');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(bx, by, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        break;
+      }
+      case 'cannon': {
+        const g = ctx.createRadialGradient(bx - r * 0.35, by - r * 0.35, r * 0.1, bx, by, r);
+        g.addColorStop(0, '#9aa3b5');
+        g.addColorStop(1, '#22262f');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(bx, by, r * 1.08, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#ffd60a';
+        ctx.beginPath();
+        ctx.arc(bx - r * 0.2, by - r * 1.15, 3 + Math.sin(t * 40) * 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
+      case 'hook': {
+        const tr = this.trail;
+        if (tr.length < 3) break;
+        const a = tr[tr.length - 1];
+        const p0 = tr[tr.length - 3];
+        ctx.translate(bx, by);
+        ctx.rotate(Math.atan2(a.y - p0.y, a.x - p0.x));
+        ctx.fillStyle = '#d00000';
+        ctx.beginPath();
+        ctx.ellipse(-r * 1.5, 0, r * 0.95, r * 0.8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(-r * 1.3, -r * 0.65, r * 0.4, r * 0.3, 0.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(-r * 2.6, -r * 0.55, r * 0.35, r * 1.1);
+        break;
+      }
+      case 'magic':
+        ctx.translate(bx, by);
+        ctx.rotate(t * 6);
+        ctx.fillStyle = '#ffd60a';
+        this.star(ctx, 0, 0, r * 1.5);
+        ctx.stroke();
+        break;
+    }
+    ctx.restore();
   }
 
   /** Energy gathering into the held ball during the wind-up. */
@@ -320,7 +474,7 @@ export class SuperFx {
         ctx.beginPath();
         ctx.arc(bx, by, r, 0, Math.PI * 2);
         ctx.stroke();
-      }
+      } else this.drawSkin(ctx, s, bx, by, r, t);
     }
 
     // thunder shockwave on the ground

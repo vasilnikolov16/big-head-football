@@ -95,8 +95,11 @@ export class Career {
 
   startTournament(hero: string): TournamentRun {
     const others = CHARACTERS.filter((c) => c.id !== hero);
-    const open = others.filter((c) => !c.unlock).sort(() => Math.random() - 0.5);
-    const locked = others.filter((c) => c.unlock); // the locked ones are the final bosses
+    const locked = others.filter((c) => c.unlock === 'tournament'); // the final bosses
+    const open = others
+      .filter((c) => c.unlock !== 'tournament')
+      .sort(() => Math.random() - 0.5)
+      .slice(0, Math.max(0, 7 - locked.length));
     const run: TournamentRun = { hero, order: [...open, ...locked].map((c) => c.id), round: 0, losses: 0 };
     this.p.tournament = run;
     this.save();

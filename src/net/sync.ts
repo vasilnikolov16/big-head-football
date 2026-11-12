@@ -90,6 +90,10 @@ const packPlayer = (p: Player): PlayerPack => [
   r2(p.jumpBoostT),
   r3(p.dashT),
   p.dashDir,
+  r2(p.slowT),
+  r2(p.noJumpT),
+  r2(p.shrinkT),
+  r2(p.burnT),
 ];
 
 /**
@@ -401,6 +405,10 @@ export class GuestSync {
       p.jumpBoostT = pb[22];
       p.dashT = pb[23] ?? 0;
       p.dashDir = pb[24] ?? 0;
+      p.slowT = pb[25] ?? 0;
+      p.noJumpT = pb[26] ?? 0;
+      p.shrinkT = pb[27] ?? 0;
+      p.burnT = pb[28] ?? 0;
     }
 
     if (m.arena.goalTop[0] !== b.gt[0]) m.arena.setGoalTop(0, b.gt[0]);

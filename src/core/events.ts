@@ -47,6 +47,8 @@ export type GameEvents = {
   /** a charged player touched the ball: the wind-up before the super shot */
   superWindup: { player: number; id: string; x: number; y: number };
   superShot: { player: number; id: string; x: number; y: number };
+  /** the opponent stopped a super shot */
+  superBlocked: { player: number; id: string; x: number; y: number };
   superHit: { player: number; x: number; y: number };
   powerSpawn: { type: string; x: number };
   powerPick: { player: number; type: string; x: number; y: number; color: string; good: boolean };

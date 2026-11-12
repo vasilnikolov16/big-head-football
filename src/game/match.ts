@@ -269,7 +269,14 @@ export class Match {
       if (touched) {
         this.touchAt[p.index] = this.time;
         if (p.charged && this.phase === 'playing') this.fireSuper(p);
-        else if (sup && !sup.done) sup.finish(this); // blocked or touched again
+        else if (sup && !sup.done) {
+          if (p.index !== sup.owner) {
+            // blocked! the blocker pays with the hero's effect
+            sup.hitEffect(this, p);
+            this.events.emit('superBlocked', { player: p.index, id: sup.id, x: b.x, y: b.y });
+          }
+          sup.finish(this);
+        }
       }
     }
     this.checkClash(dt);

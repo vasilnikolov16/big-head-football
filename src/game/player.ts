@@ -91,6 +91,11 @@ export class Player {
   frozenT = 0;
   reversedT = 0;
   jumpBoostT = 0;
+  /** super-shot effects when blocking a super: slowed, can't jump, shrunken head, on fire */
+  slowT = 0;
+  noJumpT = 0;
+  shrinkT = 0;
+  burnT = 0;
   /** fire-ball power-up: this player's shots set the ball on fire */
   fireT = 0;
 
@@ -125,7 +130,7 @@ export class Player {
   }
 
   get headR(): number {
-    return this.baseHeadR * this.headScale;
+    return this.baseHeadR * this.headScale * (this.shrinkT > 0 ? 0.62 : 1);
   }
   get headX(): number {
     return this.x + this.facing * 2;
@@ -235,7 +240,7 @@ export class Player {
     if (this.dashT > 0) {
       this.dashT = Math.max(0, this.dashT - dt);
     } else {
-      const target = move * this.maxSpeed;
+      const target = move * this.maxSpeed * (this.slowT > 0 ? 0.5 : 1);
       let accel: number;
       if (this.grounded) accel = move !== 0 ? 4300 : 3800;
       else accel = move !== 0 ? 2700 : 700;
@@ -246,7 +251,7 @@ export class Player {
     }
 
     // --- jumping (with coyote time + input buffer + variable height) ---
-    if (!frozen && intent.jumpPressed) this.jumpBuffer = JUMP_BUFFER;
+    if (!frozen && intent.jumpPressed && this.noJumpT <= 0) this.jumpBuffer = JUMP_BUFFER;
     this.coyote = this.grounded ? COYOTE : this.coyote - dt;
     if (this.jumpBuffer > 0 && this.coyote > 0) {
       const boost = this.jumpBoostT > 0 ? 1.28 : 1;
@@ -291,6 +296,10 @@ export class Player {
     this.frozenT = Math.max(0, this.frozenT - dt);
     this.reversedT = Math.max(0, this.reversedT - dt);
     this.jumpBoostT = Math.max(0, this.jumpBoostT - dt);
+    this.slowT = Math.max(0, this.slowT - dt);
+    this.noJumpT = Math.max(0, this.noJumpT - dt);
+    this.shrinkT = Math.max(0, this.shrinkT - dt);
+    this.burnT = Math.max(0, this.burnT - dt);
     this.fireT = Math.max(0, this.fireT - dt);
     this.touchCooldown = Math.max(0, this.touchCooldown - dt);
     this.squash = approach(this.squash, 0, dt * 1.6);

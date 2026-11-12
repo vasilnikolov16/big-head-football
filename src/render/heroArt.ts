@@ -670,4 +670,474 @@ const senko: HeroArt = {
   },
 };
 
-export const HERO_ART: Record<string, HeroArt> = { bobo, penka, bip, roko, gica, zig, ulf, senko };
+// ------------------------------------------------------------------ Пипер (chef)
+
+const chef: HeroArt = {
+  front: ({ ctx, R }) => {
+    // curled moustache
+    ctx.fillStyle = '#4a2c17';
+    for (const [x, rot] of [
+      [0.24, 0.35],
+      [0.66, -0.35],
+    ]) {
+      ctx.beginPath();
+      ctx.ellipse(R * x, R * 0.33, R * 0.2, R * 0.08, rot, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.strokeStyle = '#4a2c17';
+    ctx.lineWidth = R * 0.07;
+    ctx.beginPath();
+    ctx.arc(R * 0.02, R * 0.22, R * 0.09, Math.PI * 0.2, Math.PI * 1.3);
+    ctx.arc(R * 0.9, R * 0.22, R * 0.09, Math.PI * 1.7, Math.PI * 0.8, true);
+    ctx.stroke();
+    // tall chef's hat
+    ctx.fillStyle = '#ffffff';
+    for (const [x, y, r] of [
+      [-0.45, -1.3, 0.42],
+      [0.42, -1.3, 0.42],
+      [0, -1.52, 0.48],
+    ]) {
+      ctx.beginPath();
+      ctx.arc(R * x, R * y, R * r, 0, Math.PI * 2);
+      ctx.fill();
+      outline(ctx, 3);
+    }
+    ctx.beginPath();
+    ctx.roundRect(-R * 0.82, -R * 1.25, R * 1.64, R * 0.42, R * 0.08);
+    ctx.fill();
+    outline(ctx, 3);
+    ctx.strokeStyle = 'rgba(22,18,43,0.25)';
+    ctx.lineWidth = 2;
+    for (const x of [-0.4, 0, 0.4]) {
+      ctx.beginPath();
+      ctx.moveTo(R * x, -R * 1.2);
+      ctx.lineTo(R * x, -R * 0.9);
+      ctx.stroke();
+    }
+  },
+  bodyFront: ({ ctx }) => {
+    // red neckerchief
+    ctx.fillStyle = '#e63946';
+    ctx.beginPath();
+    ctx.moveTo(-9, -60);
+    ctx.lineTo(9, -60);
+    ctx.lineTo(0, -48);
+    ctx.closePath();
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+  },
+};
+
+// ------------------------------------------------------------------ Влад (vampire)
+
+const vlad: HeroArt = {
+  back: ({ ctx, R }) => {
+    // high cape collar
+    for (const s of [-1, 1]) {
+      ctx.fillStyle = '#1b1b2f';
+      ctx.beginPath();
+      ctx.moveTo(s * R * 0.45, R * 0.75);
+      ctx.lineTo(s * R * 1.35, -R * 0.25);
+      ctx.lineTo(s * R * 1.0, R * 0.95);
+      ctx.closePath();
+      ctx.fill();
+      outline(ctx, 3);
+      ctx.fillStyle = '#c1121f';
+      ctx.beginPath();
+      ctx.moveTo(s * R * 0.6, R * 0.75);
+      ctx.lineTo(s * R * 1.2, -R * 0.05);
+      ctx.lineTo(s * R * 0.95, R * 0.85);
+      ctx.closePath();
+      ctx.fill();
+    }
+  },
+  skin: ({ ctx, R }) => {
+    // slicked-back hair with a widow's peak
+    ctx.fillStyle = '#14121f';
+    ctx.beginPath();
+    ctx.moveTo(-R * 1.2, -R * 1.2);
+    ctx.lineTo(R * 1.2, -R * 1.2);
+    ctx.lineTo(R * 1.2, -R * 0.55);
+    ctx.lineTo(R * 0.78, -R * 0.62);
+    ctx.lineTo(R * 0.42, -R * 0.3);
+    ctx.lineTo(R * 0.12, -R * 0.62);
+    ctx.lineTo(-R * 0.55, -R * 0.52);
+    ctx.lineTo(-R * 1.2, -R * 0.05);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-R * 0.6, -R * 0.85);
+    ctx.quadraticCurveTo(0, -R * 1.0, R * 0.6, -R * 0.82);
+    ctx.stroke();
+  },
+  front: ({ ctx, R }) => {
+    // fangs
+    ctx.fillStyle = '#ffffff';
+    for (const x of [0.4, 0.62]) {
+      ctx.beginPath();
+      ctx.moveTo(R * (x - 0.06), R * 0.4);
+      ctx.lineTo(R * (x + 0.06), R * 0.4);
+      ctx.lineTo(R * x, R * 0.56);
+      ctx.closePath();
+      ctx.fill();
+      outline(ctx, 1.5);
+    }
+  },
+};
+
+// ------------------------------------------------------------------ Огнян (firefighter)
+
+const ogi: HeroArt = {
+  skin: ({ ctx, R }) => {
+    // soot on the cheek
+    ctx.fillStyle = 'rgba(40,40,50,0.28)';
+    ctx.beginPath();
+    ctx.ellipse(R * 0.1, R * 0.38, R * 0.2, R * 0.1, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+  },
+  front: ({ ctx, R }) => {
+    // long back brim
+    ctx.fillStyle = '#b71c1c';
+    ctx.beginPath();
+    ctx.ellipse(-R * 0.55, -R * 0.3, R * 0.8, R * 0.14, 0.12, 0, Math.PI * 2);
+    ctx.fill();
+    outline(ctx, 3);
+    // helmet dome
+    const g = ctx.createLinearGradient(0, -R * 1.2, 0, -R * 0.3);
+    g.addColorStop(0, '#ff5a5a');
+    g.addColorStop(1, '#c62828');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, -R * 0.25, R * 0.98, Math.PI * 1.03, Math.PI * 1.97);
+    ctx.closePath();
+    ctx.fill();
+    outline(ctx);
+    // ridge
+    ctx.strokeStyle = '#8e1414';
+    ctx.lineWidth = R * 0.1;
+    ctx.beginPath();
+    ctx.arc(0, -R * 0.25, R * 0.62, Math.PI * 1.25, Math.PI * 1.75);
+    ctx.stroke();
+    // badge
+    ctx.fillStyle = '#ffd60a';
+    ctx.beginPath();
+    ctx.roundRect(R * 0.25, -R * 1.02, R * 0.42, R * 0.5, R * 0.1);
+    ctx.fill();
+    outline(ctx, 2.5);
+    ctx.fillStyle = '#c62828';
+    ctx.font = `bold ${Math.round(R * 0.3)}px system-ui`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('1', R * 0.46, -R * 0.76);
+  },
+  bodyFront: ({ ctx }) => {
+    // reflective stripes
+    ctx.fillStyle = '#ffd60a';
+    ctx.fillRect(-15, -44, 30, 4);
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.fillRect(-15, -43, 30, 1.5);
+  },
+};
+
+// ------------------------------------------------------------------ Снежко (snowman)
+
+const sneg: HeroArt = {
+  skin: ({ ctx, R }) => {
+    // a few snow sparkles
+    ctx.fillStyle = 'rgba(160,190,230,0.35)';
+    for (const [x, y] of [
+      [-0.6, 0.3],
+      [-0.3, 0.6],
+      [-0.75, -0.1],
+    ]) {
+      ctx.beginPath();
+      ctx.arc(R * x, R * y, R * 0.06, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+  front: ({ ctx, R }) => {
+    // carrot nose
+    ctx.fillStyle = '#ff8c1a';
+    ctx.beginPath();
+    ctx.moveTo(R * 0.58, R * 0.02);
+    ctx.lineTo(R * 1.38, R * 0.16);
+    ctx.lineTo(R * 0.6, R * 0.26);
+    ctx.closePath();
+    ctx.fill();
+    outline(ctx, 2.5);
+    ctx.strokeStyle = 'rgba(150,70,0,0.5)';
+    ctx.lineWidth = 1.5;
+    for (const x of [0.8, 1.0]) {
+      ctx.beginPath();
+      ctx.moveTo(R * x, R * 0.08);
+      ctx.lineTo(R * (x + 0.03), R * 0.2);
+      ctx.stroke();
+    }
+    // knitted beanie with a pompom
+    ctx.fillStyle = '#e63946';
+    ctx.beginPath();
+    ctx.arc(0, -R * 0.35, R * 0.92, Math.PI * 1.06, Math.PI * 1.94);
+    ctx.closePath();
+    ctx.fill();
+    outline(ctx);
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.roundRect(-R * 0.95, -R * 0.52, R * 1.9, R * 0.24, R * 0.1);
+    ctx.fill();
+    outline(ctx, 3);
+    ctx.beginPath();
+    ctx.arc(-R * 0.1, -R * 1.32, R * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    outline(ctx, 3);
+  },
+  bodyFront: ({ ctx, t }) => {
+    // coal buttons and a scarf
+    ctx.fillStyle = '#1d1d2e';
+    for (const y of [-48, -40]) {
+      ctx.beginPath();
+      ctx.arc(4, y, 2.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(-15, -61, 30, 6);
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-15, -61, 30, 6);
+    const w = Math.sin(t * 6) * 2;
+    ctx.beginPath();
+    ctx.moveTo(-12, -57);
+    ctx.lineTo(-19 + w, -42);
+    ctx.lineTo(-13 + w, -41);
+    ctx.lineTo(-7, -56);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  },
+};
+
+// ------------------------------------------------------------------ Капитан Рум (pirate)
+
+const rum: HeroArt = {
+  skin: ({ ctx, R }) => {
+    // black beard
+    ctx.fillStyle = '#1f1a17';
+    ctx.beginPath();
+    ctx.moveTo(-R * 0.8, R * 0.2);
+    ctx.lineTo(-R * 0.55, R * 0.22);
+    ctx.quadraticCurveTo(-R * 0.3, R * 0.62, R * 0.2, R * 0.58);
+    ctx.quadraticCurveTo(R * 0.7, R * 0.55, R * 1.05, R * 0.42);
+    ctx.lineTo(R * 1.1, R * 1.1);
+    ctx.lineTo(-R * 1.1, R * 1.1);
+    ctx.closePath();
+    ctx.fill();
+  },
+  front: ({ ctx, R }) => {
+    // eye patch
+    ctx.strokeStyle = '#1f1a17';
+    ctx.lineWidth = R * 0.06;
+    ctx.beginPath();
+    ctx.moveTo(-R * 0.9, -R * 0.5);
+    ctx.lineTo(R * 0.98, R * 0.02);
+    ctx.stroke();
+    ctx.fillStyle = '#1f1a17';
+    ctx.beginPath();
+    ctx.ellipse(R * 0.54, -R * 0.06, R * 0.2, R * 0.17, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // gold earring
+    ctx.strokeStyle = '#ffd60a';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(-R * 0.55, R * 0.3, R * 0.09, 0, Math.PI * 2);
+    ctx.stroke();
+    // tricorn hat with a skull
+    ctx.fillStyle = '#1f1a17';
+    ctx.beginPath();
+    ctx.moveTo(-R * 1.3, -R * 0.5);
+    ctx.quadraticCurveTo(0, -R * 0.82, R * 1.3, -R * 0.5);
+    ctx.lineTo(R * 0.85, -R * 0.98);
+    ctx.quadraticCurveTo(0, -R * 1.62, -R * 0.85, -R * 0.98);
+    ctx.closePath();
+    ctx.fill();
+    outline(ctx);
+    ctx.strokeStyle = '#c9a227';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(-R * 1.22, -R * 0.55);
+    ctx.quadraticCurveTo(0, -R * 0.86, R * 1.22, -R * 0.55);
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(0, -R * 1.08, R * 0.14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(-R * 0.08, -R * 1.0, R * 0.16, R * 0.08);
+    ctx.fillStyle = '#1f1a17';
+    ctx.beginPath();
+    ctx.arc(-R * 0.05, -R * 1.1, R * 0.035, 0, Math.PI * 2);
+    ctx.arc(R * 0.05, -R * 1.1, R * 0.035, 0, Math.PI * 2);
+    ctx.fill();
+  },
+};
+
+// ------------------------------------------------------------------ Бойко (boxer)
+
+const boyko: HeroArt = {
+  skin: ({ ctx, R }) => {
+    // buzz cut
+    ctx.fillStyle = '#2b1d12';
+    ctx.beginPath();
+    ctx.arc(0, -R * 0.1, R * 1.05, Math.PI * 1.02, Math.PI * 1.98);
+    ctx.closePath();
+    ctx.fill();
+  },
+  front: ({ ctx, R }) => {
+    // padded headguard
+    ctx.strokeStyle = '#d00000';
+    ctx.lineWidth = R * 0.28;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(0, R * 0.02, R * 0.93, Math.PI * 1.06, Math.PI * 1.94);
+    ctx.stroke();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, R * 0.02, R * 1.07, Math.PI * 1.06, Math.PI * 1.94);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, R * 0.02, R * 0.79, Math.PI * 1.08, Math.PI * 1.92);
+    ctx.stroke();
+    ctx.fillStyle = '#ffd60a';
+    ctx.font = `bold ${Math.round(R * 0.26)}px system-ui`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('★', 0, -R * 0.92);
+    // plaster on the nose
+    ctx.fillStyle = '#f1d3b3';
+    ctx.save();
+    ctx.translate(R * 0.82, R * 0.08);
+    ctx.rotate(0.6);
+    ctx.fillRect(-R * 0.16, -R * 0.05, R * 0.32, R * 0.1);
+    ctx.rotate(-1.2);
+    ctx.fillRect(-R * 0.16, -R * 0.05, R * 0.32, R * 0.1);
+    ctx.restore();
+  },
+};
+
+// ------------------------------------------------------------------ Звездан (wizard)
+
+const starPath = (ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void => {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    const rr = i % 2 ? r * 0.45 : r;
+    ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  ctx.closePath();
+};
+
+const zvezdan: HeroArt = {
+  front: ({ ctx, R, t }) => {
+    // long white beard
+    ctx.fillStyle = '#f8f9fa';
+    ctx.beginPath();
+    ctx.moveTo(-R * 0.35, R * 0.15);
+    ctx.quadraticCurveTo(-R * 0.2, R * 1.1, R * 0.35, R * 1.55);
+    ctx.quadraticCurveTo(R * 0.6, R * 1.0, R * 1.0, R * 0.2);
+    ctx.quadraticCurveTo(R * 0.55, R * 0.42, R * 0.3, R * 0.3);
+    ctx.quadraticCurveTo(0, R * 0.38, -R * 0.35, R * 0.15);
+    ctx.closePath();
+    ctx.fill();
+    outline(ctx, 3);
+    // pointy hat leaning back
+    ctx.fillStyle = '#3a0ca3';
+    ctx.beginPath();
+    ctx.moveTo(-R * 0.95, -R * 0.42);
+    ctx.lineTo(R * 0.95, -R * 0.42);
+    ctx.quadraticCurveTo(R * 0.2, -R * 1.2, -R * 0.55, -R * 2.05);
+    ctx.quadraticCurveTo(-R * 0.55, -R * 1.2, -R * 0.95, -R * 0.42);
+    ctx.closePath();
+    ctx.fill();
+    outline(ctx);
+    ctx.fillStyle = '#2a0880';
+    ctx.beginPath();
+    ctx.ellipse(0, -R * 0.42, R * 1.18, R * 0.17, 0, 0, Math.PI * 2);
+    ctx.fill();
+    outline(ctx, 3);
+    ctx.fillStyle = '#ffd60a';
+    for (const [x, y, r] of [
+      [-0.1, -0.85, 0.13],
+      [-0.4, -1.35, 0.09],
+      [0.25, -0.62, 0.07],
+    ]) {
+      starPath(ctx, R * x, R * y, R * r * (1 + Math.sin(t * 4 + x * 9) * 0.15));
+      ctx.fill();
+    }
+  },
+};
+
+// ------------------------------------------------------------------ Рекс (dino)
+
+const rex: HeroArt = {
+  back: ({ ctx, R }) => {
+    // plates along the back of the head
+    ctx.fillStyle = '#f9a03f';
+    for (let i = 0; i < 4; i++) {
+      const a = Math.PI * (1.12 + i * 0.13);
+      const x = Math.cos(a) * R * 0.95;
+      const y = Math.sin(a) * R * 0.95;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(a + Math.PI / 2);
+      ctx.beginPath();
+      ctx.moveTo(-R * 0.15, 0);
+      ctx.lineTo(0, -R * 0.36);
+      ctx.lineTo(R * 0.15, 0);
+      ctx.closePath();
+      ctx.fill();
+      outline(ctx, 2.5);
+      ctx.restore();
+    }
+  },
+  skin: ({ ctx, R }) => {
+    // lighter snout and spots
+    ctx.fillStyle = 'rgba(200,240,170,0.45)';
+    ctx.beginPath();
+    ctx.ellipse(R * 0.62, R * 0.32, R * 0.5, R * 0.32, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(30,80,20,0.35)';
+    for (const [x, y, r] of [
+      [-0.5, -0.5, 0.12],
+      [-0.2, -0.75, 0.08],
+      [-0.7, 0.05, 0.1],
+    ]) {
+      ctx.beginPath();
+      ctx.arc(R * x, R * y, R * r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+  front: ({ ctx, R }) => {
+    // nostrils and teeth
+    ctx.fillStyle = '#1f3d14';
+    for (const x of [0.88, 0.98]) {
+      ctx.beginPath();
+      ctx.ellipse(R * x, R * 0.12, R * 0.035, R * 0.05, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#ffffff';
+    for (let i = 0; i < 4; i++) {
+      const x = R * (0.3 + i * 0.16);
+      ctx.beginPath();
+      ctx.moveTo(x - R * 0.05, R * 0.38);
+      ctx.lineTo(x + R * 0.05, R * 0.38);
+      ctx.lineTo(x, R * 0.5);
+      ctx.closePath();
+      ctx.fill();
+      outline(ctx, 1.2);
+    }
+  },
+};
+
+export const HERO_ART: Record<string, HeroArt> = { bobo, penka, bip, roko, gica, zig, ulf, senko, chef, vlad, ogi, sneg, rum, boyko, zvezdan, rex };

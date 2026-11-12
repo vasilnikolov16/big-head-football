@@ -226,6 +226,7 @@ const S: Record<string, [string, string]> = {
   'sel.power': ['Сила', 'Power'],
   'sel.head': ['Глава', 'Head'],
   'sel.locked': ['Победи го в турнира', 'Beat them in the tournament'],
+  'sel.lockedShop': ['Купи го в магазина за {n} 🪙', 'Buy them in the shop for {n} 🪙'],
   'sel.hint.cpu0': ['← → ↑ ↓ разглеждане   ·   Enter готов   ·   Esc назад', '← → ↑ ↓ browse   ·   Enter ready   ·   Esc back'],
   'sel.hint.cpu1': [
     '← → ↑ ↓ разглеждане   ·   Enter готов   ·   R случаен   ·   Esc назад',

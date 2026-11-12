@@ -45,6 +45,7 @@ export class GameAudio {
       ev.on('superWindup', (e) => a.playCharge(e.id as SuperSfx)),
       ev.on('superShot', (e) => a.playSuper(e.id as SuperSfx)),
       ev.on('superHit', () => a.play('superHit', v)),
+      ev.on('superBlocked', () => a.play('superBlock', v)),
       ev.on('powerSpawn', () => {
         if (!quiet) a.play('powerSpawn');
       }),
