@@ -90,6 +90,8 @@ export interface Progress {
   dailyDate: string;
   /** league season in progress */
   league: LeagueRun | null;
+  /** wheel of fortune: when it was last spun (ms) */
+  lastSpin: number;
 }
 
 const KEY = 'kratunball.progress.v1';
@@ -140,6 +142,7 @@ export function freshProgress(): Progress {
     equipped: { ...DEFAULT_EQUIP },
     dailyDate: '',
     league: null,
+    lastSpin: 0,
   };
 }
 
@@ -159,6 +162,7 @@ export function loadProgress(): Progress {
     }
   }
   if (typeof saved.dailyDate === 'string') p.dailyDate = saved.dailyDate;
+  if (typeof saved.lastSpin === 'number' && saved.lastSpin > 0) p.lastSpin = Math.min(saved.lastSpin, Date.now());
   if (saved.league && Array.isArray(saved.league.teams)) p.league = saved.league;
   for (const k of ['stadiumWins', 'partyModes', 'superGoalHeroes'] as const) if (!Array.isArray(p.stats[k])) p.stats[k] = [];
   return p;

@@ -2677,3 +2677,75 @@ canvas {
 .scr-panel > .panel > .panel-body {
   padding: 2px 4px 8px;
 }
+
+/* wheel of fortune */
+.wheel .panel {
+  width: 760px;
+  text-align: center;
+}
+.wheel-wrap {
+  position: relative;
+  width: 330px;
+  height: 330px;
+  margin: 0 auto;
+}
+.wheel-wrap canvas {
+  width: 330px;
+  height: 330px;
+}
+.wheel-pointer {
+  position: absolute;
+  left: 50%;
+  top: -6px;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 18px solid transparent;
+  border-right: 18px solid transparent;
+  border-top: 34px solid #fff3b0;
+  filter: drop-shadow(0 3px 0 var(--ink)) drop-shadow(0 0 8px rgba(255, 210, 63, 0.8));
+  z-index: 2;
+}
+.wheel-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 26px;
+}
+.wheel-side {
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+.wheel-status {
+  font-family: var(--display);
+  font-size: 20px;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wheel-result {
+  font-family: var(--display);
+  font-size: 24px;
+  color: var(--gold);
+  text-shadow: 0 3px 0 var(--ink);
+  min-height: 60px;
+  animation: coinPop 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+.icon-btn.wheel-btn.ready {
+  background: linear-gradient(180deg, #ff8fc7, #c77dff);
+  animation: wheelGlow 1.4s ease-in-out infinite;
+}
+@keyframes wheelGlow {
+  50% {
+    box-shadow:
+      0 5px 0 var(--ink),
+      0 0 22px rgba(255, 143, 199, 0.85);
+  }
+}
+.icon-btn.wheel-btn.ready .icon-btn-icon {
+  animation: spin 3s linear infinite;
+}

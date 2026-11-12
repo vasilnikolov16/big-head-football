@@ -80,7 +80,12 @@ interface Fan {
   speed: number;
   jumpy: number;
   seed: number;
+  /** holds a flag (team colour) / a scarf up */
+  flag: string | null;
 }
+
+const FLAG_LEFT = ['#ff4d4d', '#ffd23f', '#ff7a3c'];
+const FLAG_RIGHT = ['#2f8cff', '#4fd1ff', '#ffffff'];
 
 const SKIN = ['#f6d0b1', '#eab48c', '#c98d63', '#9c6644', '#6e4529', '#f3c49b'];
 const LEFT_SHIRTS = ['#ff4d4d', '#ff7a3c', '#ffd23f', '#ff4d6d', '#e83a3a', '#ffffff'];
@@ -205,6 +210,7 @@ export class Stadium {
           speed: 5 + rnd() * 5,
           jumpy: 0.5 + rnd() * 0.8,
           seed: rnd(),
+          flag: side !== 2 && rnd() < 0.07 ? (side === 0 ? FLAG_LEFT : FLAG_RIGHT)[Math.floor(rnd() * 3)] : null,
         });
       }
     }
@@ -266,6 +272,17 @@ export class Stadium {
     roundRect(g, 5, 22, 16, 18, 6);
     g.fill();
     g.stroke();
+    // a team scarf or stripes on some
+    const look = (shirt.charCodeAt(1) + skin.charCodeAt(2) + (hat ? 3 : 0)) % 4;
+    if (look === 0) {
+      g.fillStyle = shirt === '#ffffff' ? '#e63946' : '#ffffff';
+      g.fillRect(6, 23, 14, 3.5);
+      g.fillRect(14, 23, 3.5, 9);
+    } else if (look === 1) {
+      g.fillStyle = 'rgba(255,255,255,0.35)';
+      g.fillRect(7, 28, 12, 2);
+      g.fillRect(7, 33, 12, 2);
+    }
     // head
     g.fillStyle = skin;
     g.beginPath();
@@ -292,20 +309,93 @@ export class Stadium {
     this.excitement += (0.12 - this.excitement) * Math.min(1, dt * 0.35);
   }
 
+  /**
+   * The crowd: a gentle sway when calm, a Mexican wave running around the
+   * stands every now and then, flags waving, and jumping with arms up (only
+   * the scoring side's fans) when something happens. Camera flashes pop.
+   */
   drawCrowd(ctx: CanvasRenderingContext2D, t: number): void {
     const e = this.excitement;
+    // a Mexican wave every ~16 s when the crowd is calm
+    const wavePeriod = 16;
+    const wt = t % wavePeriod;
+    const waveOn = e < 0.45 && wt < 5;
+    const span = W + this.mx * 2;
+    const waveX = -this.mx + (wt / 5) * (span + 400) - 200;
+    const flags: Fan[] = [];
     for (const f of this.fans) {
       const side = f.sprite < 12 ? 0 : f.sprite < 24 ? 1 : -1;
       const cheering = this.cheerSide === -1 || side === this.cheerSide || side === -1;
-      const energy = cheering ? e : e * 0.15;
-      const amp = (0.6 + energy * 9) * f.jumpy;
-      const bob = Math.abs(Math.sin(t * f.speed * (0.4 + energy * 0.7) + f.phase)) * amp;
-      const up = energy > 0.45 && f.seed < energy;
+      const energy = cheering ? e : e * 0.12;
+      // calm: a slow, smooth sway (not a tremble)
+      const sway = Math.sin(t * (0.9 + f.speed * 0.08) + f.phase) * 1.2;
+      let lift = (Math.sin(t * 1.6 + f.phase * 2) + 1) * 0.5 * f.jumpy;
+      let up = false;
+      // excited: smooth hops, the most excited throw their arms up
+      if (energy > 0.25) {
+        const hop = Math.max(0, Math.sin(t * (5 + f.speed * 0.4) + f.phase));
+        lift += hop * hop * energy * 12 * f.jumpy;
+        up = f.seed < energy * 0.9;
+      }
+      // the wave: fans stand up as it passes
+      if (waveOn) {
+        const d = (f.x - waveX) / 70;
+        const k = Math.exp(-d * d);
+        if (k > 0.05) {
+          lift += k * 9;
+          if (k > 0.45) up = true;
+        }
+      }
       const spr = up ? this.spritesUp[f.sprite] : this.sprites[f.sprite];
       const w = 26 * f.s;
       const h = 40 * f.s;
-      ctx.drawImage(spr, f.x - w / 2, f.y - h - bob, w, h);
+      ctx.drawImage(spr, f.x - w / 2 + sway, f.y - h - lift, w, h);
+      if (f.flag) flags.push(f);
     }
+    // flags on poles, waving
+    ctx.save();
+    ctx.lineWidth = 1.5;
+    for (const f of flags) {
+      const h = 40 * f.s;
+      const px = f.x + 6 * f.s;
+      const top = f.y - h - 18 * f.s;
+      ctx.strokeStyle = '#d9d9d9';
+      ctx.beginPath();
+      ctx.moveTo(px, f.y - h * 0.45);
+      ctx.lineTo(px, top);
+      ctx.stroke();
+      ctx.fillStyle = f.flag!;
+      ctx.beginPath();
+      const fw = 16 * f.s;
+      const fh = 10 * f.s;
+      const wv = (x: number): number => Math.sin(t * 6 + f.phase + x * 0.35) * 2 * f.s * (0.4 + e);
+      ctx.moveTo(px, top);
+      for (let x = 0; x <= fw; x += 4) ctx.lineTo(px + x, top + wv(x));
+      for (let x = fw; x >= 0; x -= 4) ctx.lineTo(px + x, top + fh + wv(x));
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+    // camera flashes: a few all the time, a storm after a goal
+    const n = Math.round(2 + e * 14);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < n; i++) {
+      const slot = Math.floor(t * 7 + i * 13.7);
+      const r1 = Math.sin(slot * 12.9898 + i * 78.233) * 43758.5453;
+      const r2 = Math.sin(slot * 39.425 + i * 11.13) * 24634.634;
+      const fx = -this.mx + (r1 - Math.floor(r1)) * span;
+      const fy = 120 + (r2 - Math.floor(r2)) * 320;
+      const life = (t * 7 + i * 13.7) % 1;
+      if (life > 0.35) continue;
+      const a = 1 - life / 0.35;
+      const g = ctx.createRadialGradient(fx, fy, 0, fx, fy, 14);
+      g.addColorStop(0, `rgba(255,255,255,${0.9 * a})`);
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(fx - 14, fy - 14, 28, 28);
+    }
+    ctx.restore();
   }
 
   // ---------------------------------------------------------------- static layers

@@ -199,7 +199,7 @@ export function heroSelect(o: HeroSelectOptions): Screen {
         : t('sel.hint.pvp', { a: keysText(o.keys[0]), b: keysText(o.keys[1]) });
     }
     if (!online) {
-      startBtn.textContent = allReady() ? t('sel.start') : cpu ? t('sel.pickBoth') : t('sel.waitBoth');
+      startBtn.textContent = allReady() ? t('sel.start') : tour ? t('sel.pickOne') : cpu ? t('sel.pickBoth') : t('sel.waitBoth');
       startBtn.classList.toggle('disabled', !allReady());
       startBtn.classList.toggle('sel', allReady());
     }

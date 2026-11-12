@@ -2,6 +2,16 @@ import type { Difficulty } from '../ai/aiController';
 import { CHARACTERS } from './characters';
 import { cosItem, cosKey, isDefault, type CosCat } from './cosmetics';
 import { PARTY_IDS } from './stadiums';
+import { pickHero, pickItem, rollSegment, SEGMENTS, SPIN_EVERY } from './wheel';
+import type { CosItem } from './cosmetics';
+
+export interface WheelResult {
+  segment: number;
+  coins: number;
+  item?: CosItem;
+  hero?: string;
+  achievements: Achievement[];
+}
 import { loadProgress, saveProgress, freshProgress, type Progress, type TournamentRun } from './progress';
 import type { MatchSummary } from './tracker';
 
@@ -163,6 +173,42 @@ export class Career {
     this.pendingCoins = 0;
     this.save();
     return true;
+  }
+
+  // ------------------------------------------------------------------ wheel of fortune
+
+  get nextSpinAt(): number {
+    return this.p.lastSpin + SPIN_EVERY;
+  }
+
+  canSpin(now = Date.now()): boolean {
+    return now >= this.nextSpinAt;
+  }
+
+  /** spins the wheel and gives the prize; null when it isn't time yet */
+  spin(): WheelResult | null {
+    if (!this.canSpin()) return null;
+    this.p.lastSpin = Date.now();
+    const segment = rollSegment();
+    const prize = SEGMENTS[segment].prize;
+    const res: WheelResult = { segment, coins: 0, achievements: [] };
+    if (prize.kind === 'item') {
+      const it = pickItem((c) => this.owns(c.cat, c.id));
+      if (it) {
+        this.p.owned.push(cosKey(it.cat, it.id));
+        this.p.equipped[it.cat] = it.id;
+        res.item = it;
+      } else res.coins = 150;
+    } else if (prize.kind === 'hero') {
+      const id = pickHero((h) => this.isUnlocked(h));
+      if (id) {
+        this.p.unlocked.push(id);
+        res.hero = id;
+      } else res.coins = 300;
+    } else res.coins = prize.n;
+    res.achievements = this.addCoins(res.coins);
+    this.save();
+    return res;
   }
 
   /** the daily challenge was completed (once per day) */

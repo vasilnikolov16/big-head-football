@@ -10,6 +10,7 @@ import { Keyboard } from '../input/keyboard';
 import { MultiController, TouchControls } from '../input/touch';
 import { touchLayoutScreen } from '../ui/touchLayoutUi';
 import { partyScreen } from '../ui/partyUi';
+import { wheelScreen } from '../ui/wheelUi';
 import { dailyScreen, leagueScreen } from '../ui/leagueUi';
 import { LEAGUE_WIN_COINS, newLeague, nextOpponent, playRound } from './league';
 import { dailyChallenge, dailyDone, todayKey, type DailyChallenge } from './daily';
@@ -452,6 +453,21 @@ export class Game implements AppActions {
       rules: c.party ? PARTY_MODES[c.party].rules : undefined,
       party: c.party ?? undefined,
     });
+  }
+
+  // ------------------------------------------------------------------ wheel of fortune
+
+  showWheel(): void {
+    if (this.setup?.mode !== 'demo') this.startDemo();
+    this.ui.show(
+      wheelScreen({
+        career: this.career,
+        tick: () => this.audio.play('uiMove'),
+        win: (big) => this.audio.play(big ? 'goal' : 'powerPick'),
+        toast: (i, a, b) => this.toaster.show(i, a, b),
+        back: () => this.showMain(),
+      }),
+    );
   }
 
   // ------------------------------------------------------------------ shop

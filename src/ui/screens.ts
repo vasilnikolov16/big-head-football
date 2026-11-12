@@ -28,6 +28,7 @@ export interface AppActions extends SettingsHost {
   showLeague(): void;
   readonly career: Career;
   showDaily(): void;
+  showWheel(): void;
   startPvp(): void;
   rematch(): void;
   changeHeroes(): void;
@@ -138,8 +139,9 @@ export function mainMenu(app: AppActions): Screen {
   const shop = iconBtn('🛒', t('menu.shop'), () => app.showShop(), 'shop-btn');
   const stats = iconBtn('📊', t('menu.statsShort'), () => app.showStats());
   const help = iconBtn('❓', t('menu.howto'), () => app.showHowTo(() => app.showMain()));
+  const wheel = iconBtn('🎡', t('menu.wheel'), () => app.showWheel(), app.career.canSpin() ? 'wheel-btn ready' : 'wheel-btn');
   const cog = iconBtn('⚙️', t('menu.settings'), () => app.showSettings(() => app.showMain()), 'cog');
-  const bottom = h('div', 'main-bottom', undefined, [h('div', 'main-bottom-left', undefined, [shop.el, stats.el, help.el]), cog.el]);
+  const bottom = h('div', 'main-bottom', undefined, [h('div', 'main-bottom-left', undefined, [wheel.el, shop.el, stats.el, help.el]), cog.el]);
   root.append(bottom);
 
   if (!app.touchMode) root.append(hints(t('menu.hints')));
@@ -147,7 +149,7 @@ export function mainMenu(app: AppActions): Screen {
     const tip = installTip();
     if (tip) root.append(hints(tip));
   }
-  const items = [...tiles, dailyItem, shop, stats, help, cog];
+  const items = [...tiles, dailyItem, wheel, shop, stats, help, cog];
   return { id: 'main', root, items, initial: 0 };
 }
 
