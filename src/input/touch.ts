@@ -92,6 +92,10 @@ export class TouchControls implements Controller {
     host.append(root);
 
     root.addEventListener('pointerdown', this.down, { passive: false });
+    // iPhone: stops the long-press magnifier / text selection that hitches the game
+    // while a button is held (pointer events still arrive)
+    root.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+    root.addEventListener('contextmenu', (e) => e.preventDefault());
     root.addEventListener('pointermove', this.move, { passive: false });
     root.addEventListener('pointerup', this.up);
     root.addEventListener('pointercancel', this.up);

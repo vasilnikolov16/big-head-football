@@ -505,12 +505,31 @@ export class Stadium {
     ctx.restore();
   }
 
+  private boardText = new Map<string, HTMLCanvasElement>();
+
+  /** an ad label with its neon glow, drawn once and reused */
+  private adLabel(text: string, color: string, w: number): HTMLCanvasElement {
+    const key = text + color;
+    let c = this.boardText.get(key);
+    if (c) return c;
+    const res = 2;
+    c = makeCanvas(w * res, 38 * res);
+    const g = c.getContext('2d')!;
+    g.scale(res, res);
+    g.font = `20px ${FONT_DISPLAY}`;
+    g.textBaseline = 'middle';
+    g.textAlign = 'center';
+    g.shadowColor = color;
+    g.shadowBlur = 12;
+    g.fillStyle = color;
+    g.fillText(text, w / 2, 20);
+    this.boardText.set(key, c);
+    return c;
+  }
+
   drawBoards(ctx: CanvasRenderingContext2D, t: number): void {
     const segW = W / 6;
     ctx.save();
-    ctx.font = `20px ${FONT_DISPLAY}`;
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'center';
     const extra = Math.ceil((this.mx - BG_MARGIN) / segW);
     for (let i = -extra; i < 6 + extra; i++) {
       const x0 = i * segW + 3;
@@ -523,10 +542,7 @@ export class Stadium {
       ctx.fillRect(x0, 460, segW - 6, 38);
       const slide = ((t / 6) % 1) * 6; // 0..6 s
       const off = slide < 0.4 ? (1 - slide / 0.4) * 40 : 0;
-      ctx.shadowColor = ad.color;
-      ctx.shadowBlur = 12;
-      ctx.fillStyle = ad.color;
-      ctx.fillText(tx(ad.text), x0 + (segW - 6) / 2, 480 + off);
+      ctx.drawImage(this.adLabel(tx(ad.text), ad.color, segW - 6), x0, 460 + off, segW - 6, 38);
       ctx.restore();
     }
     ctx.restore();

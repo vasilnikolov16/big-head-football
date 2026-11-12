@@ -81,8 +81,10 @@ export class UI {
     screen.root.classList.remove('entering');
     screen.items.forEach((item, i) => {
       item.el.classList.add('nav');
-      item.el.addEventListener('mouseenter', () => {
-        if (!item.disabled) this.select(i, false);
+      // select on real mouse movement only: a highlighted row that grows a little must not
+      // "steal" the selection back and forth under a cursor that stands still
+      item.el.addEventListener('mousemove', (e) => {
+        if (!item.disabled && (e.movementX !== 0 || e.movementY !== 0)) this.select(i, false);
       });
       item.el.addEventListener('click', (e) => {
         e.preventDefault();
@@ -260,6 +262,12 @@ export function sliderRow(label: string, get: () => number, set: (v: number) => 
   });
   // keep clicks on the slider from triggering the row action
   for (const ev of ['click', 'pointerdown', 'keydown']) input.addEventListener(ev, (e) => e.stopPropagation());
+  // the menu handles the keyboard (←/→ in 5 % steps): the native slider must not keep focus and
+  // move as well, nor react to the mouse wheel
+  input.tabIndex = -1;
+  input.addEventListener('pointerup', () => input.blur());
+  input.addEventListener('change', () => input.blur());
+  input.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
   const shift = (d: number): void => {
     const v = Math.max(0, Math.min(100, Math.round(get() * 100 / 5) * 5 + d));
     set(v / 100);

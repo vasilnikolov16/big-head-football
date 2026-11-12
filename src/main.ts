@@ -31,6 +31,11 @@ async function boot(): Promise<void> {
 
 void boot();
 
+// long-press menus (iPhone/Android) make no sense in a game
+window.addEventListener('contextmenu', (e) => {
+  if (!(e.target instanceof HTMLInputElement)) e.preventDefault();
+});
+
 // installed app (Add to Home Screen): works offline after the first visit
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {

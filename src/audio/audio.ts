@@ -281,41 +281,53 @@ export class AudioEngine {
     const k = Math.max(0.15, Math.min(1, intensity));
     switch (name) {
       case 'kick':
-        this.tone('sine', 160, 48, t, 0.14, 0.9 * k);
-        this.noiseHit(t, 0.05, 0.45 * k, 'highpass', 2500);
+        // a full leather "thwack": low thump + slap of the boot + tiny click
+        this.tone('sine', 125, 52, t, 0.13, 0.85 * k, this.sfxBus, 0.001);
+        this.tone('triangle', 260, 150, t, 0.06, 0.22 * k, this.sfxBus, 0.001);
+        this.noiseHit(t, 0.05, 0.5 * k, 'bandpass', 1900, 900, 1.3);
+        this.noiseHit(t, 0.014, 0.22 * k, 'highpass', 5200);
         break;
       case 'kickPerfect':
-        this.tone('sine', 180, 45, t, 0.18, 1);
-        this.noiseHit(t, 0.07, 0.6, 'highpass', 2200);
-        this.tone('triangle', 1300, 500, t, 0.12, 0.25);
-        this.noiseHit(t + 0.01, 0.25, 0.25, 'bandpass', 3000, 900, 1.2);
+        this.tone('sine', 140, 48, t, 0.2, 1, this.sfxBus, 0.001);
+        this.tone('triangle', 300, 140, t, 0.08, 0.3, this.sfxBus, 0.001);
+        this.noiseHit(t, 0.07, 0.75, 'bandpass', 2300, 1000, 1.2);
+        this.noiseHit(t, 0.02, 0.4, 'highpass', 4500);
+        // the ball rips through the air
+        this.noiseHit(t + 0.02, 0.32, 0.16, 'bandpass', 900, 3200, 1.6, this.sfxBus, 0.05);
         break;
       case 'header':
-        this.tone('sine', 330, 170, t, 0.16, 0.6 * k);
-        this.tone('triangle', 520, 300, t, 0.08, 0.15 * k);
-        this.noiseHit(t, 0.04, 0.2 * k, 'bandpass', 1500);
+        // a round "bonk" off the big head
+        this.tone('sine', 250, 145, t, 0.13, 0.55 * k, this.sfxBus, 0.002);
+        this.tone('sine', 500, 300, t, 0.05, 0.12 * k, this.sfxBus, 0.002);
+        this.noiseHit(t, 0.04, 0.22 * k, 'bandpass', 1100, 700, 1);
         break;
       case 'bounce':
-        this.tone('sine', 110, 60, t, 0.1, 0.55 * k);
-        this.noiseHit(t, 0.06, 0.25 * k, 'lowpass', 900);
+        // soft thud on the grass
+        this.tone('sine', 88, 46, t, 0.11, 0.5 * k, this.sfxBus, 0.002);
+        this.noiseHit(t, 0.05, 0.2 * k, 'lowpass', 650, 400);
         break;
       case 'wall':
-        this.tone('sine', 140, 80, t, 0.1, 0.45 * k);
-        this.noiseHit(t, 0.08, 0.3 * k, 'bandpass', 600, 300, 0.7);
+        // thump against the glass wall
+        this.tone('sine', 115, 70, t, 0.12, 0.42 * k, this.sfxBus, 0.002);
+        this.noiseHit(t, 0.07, 0.25 * k, 'bandpass', 520, 320, 0.8);
+        this.tone('sine', 1850, 1820, t, 0.18, 0.035 * k);
         break;
-      case 'post':
-        for (const [f, d, v] of [
-          [523, 0.9, 0.35],
-          [1307, 0.6, 0.22],
-          [2143, 0.45, 0.14],
-          [2973, 0.3, 0.1],
-          [3900, 0.2, 0.06],
+      case 'post': {
+        // the crossbar rings like a metal tube (inharmonic partials) after a sharp hit
+        const f0 = 410;
+        for (const [r, d, v] of [
+          [1, 1.3, 0.3],
+          [2.756, 0.85, 0.17],
+          [5.404, 0.5, 0.1],
+          [8.933, 0.3, 0.06],
         ])
-          this.tone('sine', f, f * 0.995, t, d, v * k);
-        this.noiseHit(t, 0.03, 0.4 * k, 'highpass', 3000);
+          this.tone('sine', f0 * r * (1 + Math.random() * 0.004), f0 * r * 0.997, t, d, v * k, this.sfxBus, 0.001);
+        this.noiseHit(t, 0.025, 0.45 * k, 'highpass', 3800);
+        this.tone('sine', 170, 90, t, 0.1, 0.3 * k, this.sfxBus, 0.001);
         break;
+      }
       case 'jump':
-        this.noiseHit(t, 0.12, 0.12, 'bandpass', 500, 1600, 1.5);
+        this.noiseHit(t, 0.1, 0.07, 'bandpass', 450, 1300, 1.4);
         break;
       case 'dash':
         this.noiseHit(t, 0.16, 0.22 * k, 'bandpass', 900, 2600, 1.2);
@@ -372,14 +384,18 @@ export class AudioEngine {
         [2400, 2900, 2600].forEach((f, i) => this.tone('sine', f, f * 1.25, t + 0.12 + i * 0.09, 0.07, 0.1));
         break;
       case 'uiMove':
-        this.tone('square', 880, 880, t, 0.04, 0.06);
+        // a soft glassy tick
+        this.tone('sine', 1480, 1440, t, 0.045, 0.03, this.sfxBus, 0.002);
+        this.tone('sine', 2960, 2900, t, 0.025, 0.008, this.sfxBus, 0.002);
         break;
       case 'uiSelect':
-        this.tone('square', 660, 660, t, 0.05, 0.08);
-        this.tone('square', 990, 990, t + 0.05, 0.08, 0.08);
+        // a gentle two-note chime
+        this.tone('sine', 988, 988, t, 0.16, 0.05, this.sfxBus, 0.003);
+        this.tone('sine', 1480, 1480, t + 0.055, 0.24, 0.045, this.sfxBus, 0.003);
+        this.tone('sine', 2960, 2960, t + 0.055, 0.1, 0.008, this.sfxBus, 0.003);
         break;
       case 'uiBack':
-        this.tone('square', 520, 390, t, 0.08, 0.07);
+        this.tone('sine', 880, 660, t, 0.12, 0.04, this.sfxBus, 0.003);
         break;
       case 'countdown':
         this.tone('square', 880, 880, t, 0.1, 0.1);

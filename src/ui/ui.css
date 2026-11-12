@@ -298,7 +298,7 @@
 .opt-row.sel {
   border-color: var(--gold);
   background: rgba(255, 210, 63, 0.1);
-  transform: scale(1.02);
+  box-shadow: 0 0 18px rgba(255, 210, 63, 0.18);
 }
 .opt-label {
   font-family: var(--display);
@@ -1270,8 +1270,7 @@
 }
 .touch-pad .tb-super {
   right: calc(var(--sr) + var(--edge) + (var(--aw) + var(--gap)) * 2);
-  opacity: calc(var(--topac, 0.8) * 0.6);
-  filter: saturate(0.4);
+  opacity: calc(var(--topac, 0.8) * 0.55);
 }
 .touch-pad .tb-super.ready {
   opacity: 1;
@@ -1279,13 +1278,13 @@
   border-color: #fff3b0;
   background: linear-gradient(180deg, rgba(255, 220, 70, 0.8), rgba(230, 120, 0, 0.75));
   animation: superPulse 0.8s ease-in-out infinite;
+  box-shadow: 0 0 26px rgba(255, 210, 63, 0.75);
 }
 .tb-super.charged {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(255, 210, 63, 0.7));
 }
 @keyframes superPulse {
   50% {
-    box-shadow: 0 0 40px rgba(255, 210, 63, 0.9);
     transform: scale(1.06);
   }
 }
@@ -1987,4 +1986,15 @@
 .scr-touchedit .edit-panel .panel-title {
   font-size: 32px;
   margin-bottom: 8px;
+}
+
+/* no long-press magnifier / callout / selection on iPhone */
+html,
+body,
+#app,
+#stage,
+canvas {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
