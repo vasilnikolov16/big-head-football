@@ -102,6 +102,8 @@ export class Match {
   /** number of super shots fired per player */
   supersUsed: [number, number] = [0, 0];
   readonly powerups: PowerUps;
+  /** ball skin from the shop (the local player's choice) */
+  ballSkin = 'classic';
   /** party mode "double ball": more balls (simple physics, no supers) */
   readonly extraBalls: Ball[] = [];
   private extraImpacts = makeImpactLog();

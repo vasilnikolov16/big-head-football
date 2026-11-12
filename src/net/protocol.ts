@@ -1,10 +1,22 @@
 import type { GameEvents } from '../core/events';
 import { STADIUM_IDS, type StadiumId } from '../game/stadiums';
+import { COS_CATS, cosItem, DEFAULT_EQUIP, type Equip } from '../game/cosmetics';
+
+/** the other player's cosmetics, keeping only items that exist */
+export function cleanEquip(e: unknown): Equip {
+  const out: Equip = { ...DEFAULT_EQUIP };
+  if (!e || typeof e !== 'object') return out;
+  for (const cat of COS_CATS) {
+    const id = (e as Record<string, unknown>)[cat];
+    if (typeof id === 'string' && cosItem(cat, id)) out[cat] = id;
+  }
+  return out;
+}
 import type { PlayerMatchStats } from '../game/player';
 import type { MatchSummary } from '../game/tracker';
 
 /** Bump when the messages change: players on different versions can't play together. */
-export const PROTOCOL = 5;
+export const PROTOCOL = 6;
 /** Public signalling ids are global: prefix them so we never collide with other apps. */
 export const ROOM_PREFIX = 'kratunball-r1-';
 /** No I, O, 0, 1: nothing that can be misread when a code is dictated. */
@@ -160,7 +172,7 @@ export type Msg =
   | { t: 'opts'; opts: LobbyOptions }
   | { t: 'goSelect' }
   | { t: 'goLobby' }
-  | { t: 'pick'; hero: string; ready: boolean }
+  | { t: 'pick'; hero: string; ready: boolean; cos?: Equip }
   | { t: 'unready' }
   | { t: 'start'; mid: number; heroes: [string, string]; opts: LobbyOptions }
   | { t: 'ev'; mid: number; l: NetEvent[] }

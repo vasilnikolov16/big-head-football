@@ -2,6 +2,7 @@ import { FONT_DISPLAY, FONT_TEXT, GROUND_Y, H, INK, SCREEN, W } from '../core/co
 import { clamp, easeOutBack, lerp } from '../core/math';
 import { t as tx } from '../i18n/i18n';
 import { drawBall, drawBallShadow } from './ballDraw';
+import { TRAIL_COLORS } from '../game/cosmetics';
 import { EMOTE_TIME, Fx } from './fx';
 import { drawCrossbar, drawGoalBack } from './goals';
 import { drawBanner, drawHud } from './hud';
@@ -196,15 +197,17 @@ export class Renderer {
 
     const fire = b.fireT > 0;
     const glow = opts.replayGlow ?? null;
-    fx.drawTrail(ctx, br, fire ? '#ff7a1f' : glow ?? '#ffffff');
+    const toucher = b.lastTouch >= 0 ? m.players[b.lastTouch] : null;
+    const trailCos = toucher?.cos && toucher.cos.trail !== 'none' ? TRAIL_COLORS[toucher.cos.trail] : undefined;
+    fx.drawTrail(ctx, br, fire ? '#ff7a1f' : glow ?? trailCos ?? '#ffffff');
     sfx.drawBack(ctx, t);
     sfx.drawDecoys(ctx, m, alpha);
     if (!hidden) {
       if (fire) this.drawFireAura(ctx, bx, by, br, t);
       if (glow) this.drawGlow(ctx, bx, by, br, glow);
-      drawBall(ctx, bx, by, br, ba);
+      drawBall(ctx, bx, by, br, ba, m.ballSkin);
     }
-    for (const e of extra) drawBall(ctx, lerp(e.px, e.x, alpha), lerp(e.py, e.y, alpha), e.r, lerp(e.pangle, e.angle, alpha));
+    for (const e of extra) drawBall(ctx, lerp(e.px, e.x, alpha), lerp(e.py, e.y, alpha), e.r, lerp(e.pangle, e.angle, alpha), m.ballSkin);
     {
     }
     sfx.drawFront(ctx, m, bx, by, br, t);

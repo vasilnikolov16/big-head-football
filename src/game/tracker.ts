@@ -17,6 +17,8 @@ export interface MatchSummary {
   powerups: [number, number];
   /** worst score difference each player had to face during the match */
   worstDeficit: [number, number];
+  /** super shots each player stopped */
+  blocks: [number, number];
 }
 
 type Action = 'touch' | 'kick' | 'header' | 'super';
@@ -35,6 +37,7 @@ export class MatchTracker {
     supers: [0, 0],
     powerups: [0, 0],
     worstDeficit: [0, 0],
+    blocks: [0, 0],
   };
   private last: { player: number; action: Action } = { player: -1, action: 'touch' };
   private whistleAt = 0;
@@ -48,6 +51,7 @@ export class MatchTracker {
       if (e.sweet > 0.75) s.perfectKicks[e.player]++;
     });
     ev.on('header', (e) => (this.last = { player: e.player, action: 'header' }));
+    ev.on('superBlocked', (e) => s.blocks[e.player]++);
     ev.on('superShot', (e) => {
       this.last = { player: e.player, action: 'super' };
       s.supers[e.player]++;

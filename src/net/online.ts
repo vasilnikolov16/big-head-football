@@ -1,13 +1,14 @@
 import { t, tr } from '../i18n/i18n';
 import { menuKeys } from '../input/controls';
 import { CHARACTERS, getCharacter } from '../game/characters';
+import { DEFAULT_EQUIP, type Equip } from '../game/cosmetics';
 import type { Game } from '../game/game';
 import { Match } from '../game/match';
 import { MatchTracker } from '../game/tracker';
 import { heroSelect, type OnlineSelectApi } from '../ui/heroSelect';
 import { lobbyScreen, onlineMenu, onlinePause, type OnlineMenuApi } from '../ui/onlineUi';
 import { postMatch } from '../ui/screens';
-import { cleanName, CODE_LEN, EMOTES, normalizeCode, type LobbyOptions, type MatchEnd, type Msg, cleanOpts } from './protocol';
+import { cleanName, CODE_LEN, EMOTES, normalizeCode, type LobbyOptions, type MatchEnd, type Msg, cleanOpts, cleanEquip } from './protocol';
 import { Room, RoomFailure, type LeaveReason } from './room';
 import { GuestInputSender, GuestSync, HostSync } from './sync';
 
@@ -283,7 +284,7 @@ export class OnlineSession {
             this.localPick = { hero, ready };
             g.settings.heroes.p1 = hero;
             g.saveSettings();
-            room.send({ t: 'pick', hero, ready });
+            room.send({ t: 'pick', hero, ready, cos: g.career.p.equipped });
           },
           requestStart: () => this.requestStart(),
           bind: (api) => {
@@ -346,6 +347,18 @@ export class OnlineSession {
     }
   }
 
+  /** the other player's shop cosmetics (from their hero pick) */
+  private remoteCos: Equip = { ...DEFAULT_EQUIP };
+
+  /** both players wear their own cosmetics; the ball is the host's */
+  private dress(m: Match): void {
+    const mine = { ...this.game.career.p.equipped };
+    const side = this.side;
+    m.players[side].cos = mine;
+    m.players[1 - side].cos = this.remoteCos;
+    m.ballSkin = side === 0 ? mine.ball : this.remoteCos.ball;
+  }
+
   private onSplashDone(): void {
     const room = this.room;
     if (!room) return;
@@ -360,6 +373,7 @@ export class OnlineSession {
       this.tracker = new MatchTracker(m);
       m.controllers[0] = g.localController();
       m.controllers[1] = this.hostSync.remote;
+      this.dress(m);
       g.beginOnlineMatch(m);
     } else {
       const m = this.pendingMirror ?? new Match(this.matchConfig(this.heroes, room.opts));
@@ -367,6 +381,7 @@ export class OnlineSession {
       if (!this.guestSync || this.guestSync.mid !== this.mid) this.guestSync = new GuestSync(this.mid, m);
       this.guestSync.setMatch(m);
       this.sender = new GuestInputSender(room, this.mid, g.localController());
+      this.dress(m);
       g.beginOnlineMatch(m);
     }
   }
@@ -565,6 +580,7 @@ export class OnlineSession {
           this.room?.send({ t: 'unready' });
         }
         this.remotePick = { hero: msg.hero, ready };
+        this.remoteCos = cleanEquip(msg.cos);
         this.selectApi?.setRemote(msg.hero, ready);
         return;
       }

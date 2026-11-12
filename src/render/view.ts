@@ -12,6 +12,8 @@ export type RenderView = Pick<
   'arena' | 'ball' | 'players' | 'decoys' | 'shockwave' | 'callout' | 'banner' | 'config' | 'score' | 'timeLeft' | 'golden' | 'phase'
 > & {
   superShot: SuperShot | null;
+  /** shop ball skin */
+  ballSkin?: string;
   /** party mode "double ball" */
   extraBalls?: Ball[];
   powerups: { items: PowerItem[]; active: ActiveEffect[] };

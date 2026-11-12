@@ -21,6 +21,7 @@ export interface AppActions extends SettingsHost {
   showStats(): void;
   showOnline(): void;
   showParty(): void;
+  showShop(): void;
   startPvp(): void;
   rematch(): void;
   changeHeroes(): void;
@@ -76,6 +77,7 @@ export function mainMenu(app: AppActions): Screen {
   const items: NavItem[] = [
     button(t('menu.cpu'), () => app.showCpuSetup()),
     button(t('menu.party'), () => app.showParty()),
+    button(t('menu.shop'), () => app.showShop()),
     button(t('menu.online'), () => app.showOnline(), 'btn', false, '🌐'),
     // two players need a keyboard (one phone screen is too small for 2 sets of buttons)
     button(t('menu.pvp'), () => app.startPvp(), 'btn', app.touchMode, app.touchMode ? t('keyboardOnly') : undefined),
@@ -340,6 +342,8 @@ export function postMatch(app: AppActions, m: Match, mode: MatchMode, extra: Pos
       button(t('post.menu'), () => app.quitToMenu(), 'btn btn-alt'),
     ];
   }
+  if (extra.note) box.append(h('div', 'post-note', extra.note));
+  if (extra.career && extra.career.coins > 0) box.append(h('div', 'post-coins', `+${extra.career.coins} 🪙`));
   if (statusEl) box.append(statusEl);
   box.append(h('div', 'row-buttons', undefined, items.map((i) => i.el)));
   if (!app.touchMode) box.append(hints(t('post.hints')));

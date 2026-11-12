@@ -7,7 +7,11 @@ const enum Kind {
   Spark,
   Confetti,
   Star,
+  Emoji,
+  Bolt,
 }
+
+const EMOJI_FONT = '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
 
 interface Particle {
   kind: Kind;
@@ -95,6 +99,49 @@ export class Particles {
     }
   }
 
+  /** goal celebration bought in the shop ('none' = the classic confetti) */
+  celebrate(kind: string, side: number, x: number, y: number): void {
+    switch (kind) {
+      case 'emoji':
+      case 'money': {
+        const set = kind === 'money' ? ['💰', '💵', '🪙'] : ['😎', '🔥', '🤩', '⚽', '💪'];
+        for (let i = 0; i < 46; i++) {
+          this.spawn(Kind.Emoji, rand(0, W), rand(-160, -10), rand(-40, 40), rand(120, 260), rand(2.2, 3.2), rand(26, 40), set[i % set.length], 120);
+        }
+        break;
+      }
+      case 'stars':
+        for (let i = 0; i < 70; i++) {
+          this.spawn(Kind.Star, rand(0, W), rand(-120, 0), rand(-30, 30), rand(160, 320), rand(2, 3), rand(6, 13), ['#ffe14d', '#ffffff', '#ffd23f', '#9be7ff'][i % 4], 60);
+        }
+        break;
+      case 'lightning':
+        for (let i = 0; i < 6; i++) this.spawn(Kind.Bolt, rand(80, W - 80), 0, 0, 0, rand(0.25, 0.6) + i * 0.08, rand(0, 1000), '#fff59d', 0);
+        this.sparks(x, y, 30, '#fff59d', 900);
+        break;
+      case 'fireworks':
+        for (let b = 0; b < 5; b++) {
+          const cx = rand(160, W - 160);
+          const cy = rand(80, 300);
+          const col = CONFETTI[b % CONFETTI.length];
+          for (let i = 0; i < 26; i++) {
+            const a = (i / 26) * Math.PI * 2;
+            const sp = rand(220, 380);
+            this.spawn(Kind.Spark, cx, cy, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.8, 1.3) + b * 0.15, 3, col, 220);
+          }
+        }
+        break;
+      default:
+        this.confetti(side);
+        return;
+    }
+    // a little confetti from the goal in every style
+    const gx = side === 0 ? 60 : W - 60;
+    for (let i = 0; i < 30; i++) {
+      this.spawn(Kind.Confetti, gx, GROUND_Y - 120, rand(-1, 1) * 420 + (side === 0 ? 260 : -260), rand(-900, -350), rand(1.6, 2.6), rand(5, 9), CONFETTI[i % CONFETTI.length], 900);
+    }
+  }
+
   confetti(side: number): void {
     // a burst from the goal + rain over the whole pitch
     const gx = side === 0 ? 60 : W - 60;
@@ -173,6 +220,35 @@ export class Particles {
           ctx.fillRect(-p.size / 2, -p.size / 3, p.size, p.size * 0.66);
           ctx.restore();
           break;
+        case Kind.Emoji:
+          ctx.save();
+          ctx.globalAlpha = Math.min(1, k * 3);
+          ctx.font = `${Math.round(p.size)}px ${EMOJI_FONT}`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(p.color, p.x, p.y);
+          ctx.restore();
+          break;
+        case Kind.Bolt: {
+          // a jagged lightning bolt from the sky, flickering
+          if (Math.floor(p.life * 30) % 3 === 0) break;
+          ctx.save();
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = 4;
+          ctx.shadowColor = '#fff59d';
+          ctx.shadowBlur = 12;
+          ctx.beginPath();
+          let x = p.x;
+          ctx.moveTo(x, 0);
+          for (let y = 40; y <= GROUND_Y; y += 40) {
+            x += Math.sin(p.size + y * 0.37) * 28;
+            ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+          ctx.restore();
+          break;
+        }
         case Kind.Star:
           ctx.save();
           ctx.translate(p.x, p.y);

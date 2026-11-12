@@ -4,6 +4,8 @@ import type { Expression, FaceStyle } from '../game/characters';
 import { DASH_TIME, type Player } from '../game/player';
 import { SUPER_INFO } from '../game/supers';
 import { HERO_ART, type HeadDraw } from './heroArt';
+import { drawHat } from './hats';
+import { SHOE_COLORS } from '../game/cosmetics';
 
 export function drawPlayerShadow(ctx: CanvasRenderingContext2D, p: Player, alpha: number): void {
   const x = lerp(p.px, p.x, alpha);
@@ -162,7 +164,10 @@ export function drawPlayer(ctx: CanvasRenderingContext2D, p: Player, alpha: numb
   const backFootX = -f * 5 - swing * 7 * f;
   const backFootY = -6 - (running ? Math.max(0, -swing) * 5 : 0);
   limb(ctx, -f * 3, hipY, backFootX, backFootY, L.sock, 7);
-  shoe(ctx, backFootX + f * 1, backFootY + 1, 0, f, shade(L.shoe), L.shoeSole);
+  const sc = p.cos && p.cos.shoes !== 'none' ? SHOE_COLORS[p.cos.shoes] : undefined;
+  const shoeUp = sc ? sc[0] : L.shoe;
+  const shoeSole = sc ? sc[1] : L.shoeSole;
+  shoe(ctx, backFootX + f * 1, backFootY + 1, 0, f, shade(shoeUp), shoeSole);
 
   // --- back arm
   const armSwing = running ? swing * 5 : Math.sin(t * 2.4 + p.index) * 1.2;
@@ -200,7 +205,7 @@ export function drawPlayer(ctx: CanvasRenderingContext2D, p: Player, alpha: numb
   }
   limb(ctx, f * 3, hipY, footX - f * 1, footY - 3, L.sock, 7);
   const kickRot = p.kicking ? -(p.footAngle - 0.12) * 0.55 * f : 0;
-  shoe(ctx, footX, footY, kickRot, f, L.shoe, L.shoeSole);
+  shoe(ctx, footX, footY, kickRot, f, shoeUp, shoeSole);
 
   // --- front arm
   limb(ctx, f * 12, -48, f * 17 + armSwing * f, -35, arms, 6);
@@ -214,6 +219,12 @@ export function drawPlayer(ctx: CanvasRenderingContext2D, p: Player, alpha: numb
   ctx.save();
   ctx.scale(1 - s * 0.25 - breathe * 0.5, 1 + s * 0.2 + breathe);
   drawHead(ctx, p, p.headR, f, t);
+  if (p.cos && p.cos.hat !== 'none') {
+    ctx.save();
+    ctx.scale(f, 1);
+    drawHat(ctx, p.cos.hat, p.headR, t);
+    ctx.restore();
+  }
   ctx.restore();
 
   drawStatus(ctx, p, t);

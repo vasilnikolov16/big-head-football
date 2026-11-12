@@ -55,7 +55,8 @@ export class Fx {
         this.addShake(16);
         this.flash = 0.7;
         this.hitStop = Math.max(this.hitStop, 0.16);
-        this.particles.confetti(side);
+        const cel = m.players[e.scorer]?.cos?.celebration ?? 'none';
+        this.particles.celebrate(cel, side, e.x, e.y);
         this.particles.sparks(e.x, e.y, 30, '#ffe680', 700);
         st.excitement = 1;
         st.cheerSide = e.scorer;
@@ -182,9 +183,10 @@ export class Fx {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.lineCap = 'round';
+    const rainbow = color === 'rainbow';
     for (let i = 1; i < n; i++) {
       const k = i / n;
-      ctx.strokeStyle = color;
+      ctx.strokeStyle = rainbow ? `hsl(${(i * 25 + performance.now() * 0.3) % 360},100%,60%)` : color;
       ctx.globalAlpha = k * 0.45;
       ctx.lineWidth = r * 1.7 * k;
       ctx.beginPath();

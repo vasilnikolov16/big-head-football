@@ -144,6 +144,7 @@ export class Recorder {
 /** A read-only stand-in for Match that the renderer can draw. */
 export interface ReplayView {
   arena: Arena;
+  ballSkin?: string;
   ball: Ball;
   players: [Player, Player];
   superShot: null;
@@ -183,9 +184,12 @@ export class ReplayPlayer {
     // start ~1.8 s before the goal
     this.pos = Math.max(0, this.goalIndex - Math.round(1.8 * SIM_HZ));
     const ghosts: [Player, Player] = [new Player(0, m.players[0].char), new Player(1, m.players[1].char)];
+    ghosts[0].cos = m.players[0].cos;
+    ghosts[1].cos = m.players[1].cos;
     const arena = new Arena();
     this.view = {
       arena,
+      ballSkin: m.ballSkin,
       ball: new Ball(),
       players: ghosts,
       superShot: null,

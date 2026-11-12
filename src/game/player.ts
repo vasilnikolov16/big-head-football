@@ -4,6 +4,7 @@ import { approach, clamp, easeOutCubic, lerp, rand } from '../core/math';
 import type { PlayerIntent } from '../input/controls';
 import type { Arena } from '../physics/arena';
 import type { CharacterDef, Expression } from './characters';
+import type { Equip } from './cosmetics';
 
 /** Kick timings (seconds) */
 export const KICK_FWD = 0.13;
@@ -91,6 +92,8 @@ export class Player {
   frozenT = 0;
   reversedT = 0;
   jumpBoostT = 0;
+  /** what the player wears (shop cosmetics); null = the hero as drawn */
+  cos: Equip | null = null;
   /** super-shot effects when blocking a super: slowed, can't jump, shrunken head, on fire */
   slowT = 0;
   noJumpT = 0;

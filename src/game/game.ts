@@ -10,6 +10,8 @@ import { Keyboard } from '../input/keyboard';
 import { MultiController, TouchControls } from '../input/touch';
 import { touchLayoutScreen } from '../ui/touchLayoutUi';
 import { partyScreen } from '../ui/partyUi';
+import { confirmScreen, shopScreen, type ShopTab } from '../ui/shopUi';
+import type { Screen as UIScreen } from '../ui/ui';
 import { PARTY_MODES, pickStadium, type MatchRules, type PartyMode, type StadiumId } from './stadiums';
 import { OnlineSession } from '../net/online';
 import { Renderer } from '../render/renderer';
@@ -49,6 +51,20 @@ export interface MatchSetup {
   allowDraw?: boolean;
   /** two humans on one keyboard (pvp, or a party match against a friend) */
   twoPlayers?: boolean;
+}
+
+/** the shop screen with the game's standard options, on a given tab */
+function shopScreenOf(g: Game, tab: ShopTab): UIScreen {
+  return shopScreen({
+    career: g.career,
+    heroId: g.settings.heroes.p1,
+    tab,
+    reopen: (next) => g.ui.show(shopScreenOf(g, next), true),
+    confirm: (c) => g.ui.show(confirmScreen({ ...c, coins: g.career.coins })),
+    sound: (snd) => g.audio.play(snd === 'buy' ? 'powerPick' : snd === 'equip' ? 'uiSelect' : 'uiBack'),
+    toast: (i, a, b) => g.toast(i, a, b),
+    back: () => g.showMain(),
+  });
 }
 
 /** Owns the main loop (fixed 120 Hz simulation + interpolated rendering) and the app flow. */
@@ -168,6 +184,12 @@ export class Game implements AppActions {
     }
     this.match = m;
     const demo = setup.mode === 'demo';
+    // the player's shop cosmetics (player 1 is "you" in every local mode)
+    if (!demo) {
+      const eq = { ...this.career.p.equipped };
+      m.players[0].cos = eq;
+      m.ballSkin = eq.ball;
+    }
     this.renderer.fx.attach(m, !demo && this.settings.cinematic);
     // the menu background match is silent: only the light menu music plays
     if (demo) this.gameAudio.detach();
@@ -354,6 +376,13 @@ export class Game implements AppActions {
 
   startPvp(): void {
     this.showHeroSelect('pvp');
+  }
+
+  // ------------------------------------------------------------------ shop
+
+  showShop(tab: ShopTab = 'ball'): void {
+    if (this.setup?.mode !== 'demo') this.startDemo();
+    this.ui.show(shopScreenOf(this, tab));
   }
 
   // ------------------------------------------------------------------ crazy modes
@@ -586,6 +615,8 @@ export class Game implements AppActions {
       result = this.career.record({
         mode,
         humans: mode === 'pvp' || this.setup.twoPlayers ? [0, 1] : [0],
+        stadium: m.config.stadium,
+        party: this.setup.party,
         heroes: [this.setup.chars[0].id, this.setup.chars[1].id],
         difficulty: this.setup.difficulty,
         summary: this.tracker.finish(),
