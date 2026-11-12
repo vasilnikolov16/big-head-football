@@ -40,7 +40,7 @@ export const ACHIEVEMENTS: Achievement[] = [
 export const TOURNAMENT_DIFFICULTY = (round: number): Difficulty => (round < 2 ? 'easy' : round < 5 ? 'medium' : 'hard');
 
 export interface MatchInfo {
-  mode: 'cpu' | 'pvp' | 'tournament' | 'online';
+  mode: 'cpu' | 'pvp' | 'tournament' | 'online' | 'party' | 'league' | 'daily';
   /** indices of the human players */
   humans: number[];
   heroes: [string, string];
@@ -117,7 +117,7 @@ export class Career {
     const st = this.p.stats;
     const s = info.summary;
     const res: CareerResult = { achievements: [], unlockedHeroes: [], roundWon: false, cupWon: false, flawless: false };
-    const vsCpu = info.mode === 'cpu' || info.mode === 'tournament';
+    const vsCpu = info.mode === 'cpu' || info.mode === 'tournament' || info.mode === 'league' || info.mode === 'daily';
     const online = info.mode === 'online';
     st.played++;
     if (info.mode === 'pvp') {

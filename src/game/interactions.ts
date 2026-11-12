@@ -112,8 +112,8 @@ function tryKick(ball: Ball, p: Player, events: Emitter<GameEvents>, opp?: Playe
 }
 
 /** Ball vs one player's head, body and shoe. */
-export function ballVsPlayer(ball: Ball, p: Player, events: Emitter<GameEvents>, opp?: Player): void {
-  if (tryKick(ball, p, events, opp)) return;
+export function ballVsPlayer(ball: Ball, p: Player, events: Emitter<GameEvents>, opp?: Player, noKicks = false): void {
+  if (!noKicks && tryKick(ball, p, events, opp)) return;
   if (ball.ghostT > 0) return; // squirting out of a scramble
 
   // Head: lively bounce, adds the head's own motion, nudges the ball forward.

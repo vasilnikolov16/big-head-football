@@ -1,6 +1,72 @@
 import { FONT_DISPLAY, GRASS_TOP, GROUND_Y, H, W } from '../core/constants';
 import { mulberry32 } from '../core/math';
 import { t as tx } from '../i18n/i18n';
+import type { StadiumId } from '../game/stadiums';
+
+interface Theme {
+  sky: [string, string, string];
+  stars: number;
+  grass: [string, string, string];
+  stripe: string;
+  speckDark: string;
+  speckLight: string;
+  /** darkens (or lightens) the stands */
+  standTint: string | null;
+  beams: number;
+}
+
+const THEMES: Record<StadiumId, Theme> = {
+  classic: {
+    sky: ['#050722', '#141a4a', '#2b1f5e'],
+    stars: 1,
+    grass: ['#2f8f3a', '#3fae45', '#2a7d33'],
+    stripe: 'rgba(255,255,255,0.055)',
+    speckDark: 'rgba(20,70,25,0.35)',
+    speckLight: 'rgba(160,240,140,0.12)',
+    standTint: null,
+    beams: 1,
+  },
+  night: {
+    sky: ['#010208', '#05081e', '#0f0b2c'],
+    stars: 2.2,
+    grass: ['#215f2a', '#2c8034', '#1d5524'],
+    stripe: 'rgba(255,255,255,0.05)',
+    speckDark: 'rgba(10,40,15,0.4)',
+    speckLight: 'rgba(160,240,140,0.08)',
+    standTint: 'rgba(0,0,12,0.38)',
+    beams: 2,
+  },
+  rain: {
+    sky: ['#232a37', '#323b4c', '#3f4859'],
+    stars: 0,
+    grass: ['#27633a', '#307548', '#1f5532'],
+    stripe: 'rgba(200,230,255,0.07)',
+    speckDark: 'rgba(10,40,25,0.35)',
+    speckLight: 'rgba(190,220,255,0.12)',
+    standTint: 'rgba(30,40,55,0.32)',
+    beams: 1.3,
+  },
+  snow: {
+    sky: ['#4c5a72', '#73839d', '#9fadc2'],
+    stars: 0,
+    grass: ['#dfe9f4', '#f3f7fc', '#cddbea'],
+    stripe: 'rgba(150,180,220,0.12)',
+    speckDark: 'rgba(120,150,190,0.3)',
+    speckLight: 'rgba(255,255,255,0.6)',
+    standTint: 'rgba(200,215,235,0.12)',
+    beams: 0.8,
+  },
+  beach: {
+    sky: ['#2a86d4', '#5fb2ec', '#bfe6ff'],
+    stars: 0,
+    grass: ['#e6c98c', '#f1d9a3', '#d6b475'],
+    stripe: 'rgba(255,255,255,0.08)',
+    speckDark: 'rgba(150,110,50,0.35)',
+    speckLight: 'rgba(255,250,230,0.5)',
+    standTint: 'rgba(255,240,200,0.1)',
+    beams: 0.25,
+  },
+};
 
 /** Extra margin around the cached background so screen shake never shows edges. */
 export const BG_MARGIN = 28;
@@ -70,7 +136,23 @@ export class Stadium {
   }
 
   /** ox, oy: how far the screen shows past the pitch on each side */
+  /** which stadium is drawn */
+  theme: StadiumId = 'classic';
+  private built: [number, number, number] = [1, 0, 0];
+
+  private get th(): Theme {
+    return THEMES[this.theme] ?? THEMES.classic;
+  }
+
+  /** switch the look (weather) and rebuild the cached layers */
+  setTheme(id: StadiumId): void {
+    if (id === this.theme) return;
+    this.theme = id;
+    this.build(...this.built);
+  }
+
   build(scale: number, ox = 0, oy = 0): void {
+    this.built = [scale, ox, oy];
     const mx = (this.mx = BG_MARGIN + Math.ceil(ox));
     const my = (this.my = BG_MARGIN + Math.ceil(oy));
     if (this.fansFor !== Math.ceil(ox)) this.buildFans(Math.ceil(ox));
@@ -79,6 +161,16 @@ export class Stadium {
     g.setTransform(scale, 0, 0, scale, mx * scale, my * scale);
     this.drawSky(g);
     this.drawStructure(g);
+    if (this.th.standTint) {
+      g.fillStyle = this.th.standTint;
+      g.fillRect(-mx, -my, W + mx * 2, 456 + my);
+    }
+    if (this.theme === 'snow') {
+      // snow on the roof edge and the concourse
+      g.fillStyle = 'rgba(255,255,255,0.9)';
+      g.fillRect(-mx, 98, W + mx * 2, 5);
+      g.fillRect(-mx, 246, W + mx * 2, 4);
+    }
     this.drawGrass(g);
     this.drawOutside(g);
 
@@ -222,13 +314,41 @@ export class Stadium {
     const mx = this.mx;
     const m = this.my;
     const sky = g.createLinearGradient(0, -m, 0, 320);
-    sky.addColorStop(0, '#050722');
-    sky.addColorStop(0.5, '#141a4a');
-    sky.addColorStop(1, '#2b1f5e');
+    const th = this.th;
+    sky.addColorStop(0, th.sky[0]);
+    sky.addColorStop(0.5, th.sky[1]);
+    sky.addColorStop(1, th.sky[2]);
     g.fillStyle = sky;
     g.fillRect(-mx, -m, W + mx * 2, H + m * 2);
     const rnd = mulberry32(7);
-    const stars = Math.round(90 * ((W + mx * 2) / W) * ((100 + m) / (100 + BG_MARGIN)));
+    const stars = Math.round(90 * th.stars * ((W + mx * 2) / W) * ((100 + m) / (100 + BG_MARGIN)));
+    if (this.theme === 'beach') {
+      // the sun and a few clouds
+      const sun = g.createRadialGradient(W - 230, 30, 10, W - 230, 30, 140);
+      sun.addColorStop(0, 'rgba(255,250,210,1)');
+      sun.addColorStop(0.25, 'rgba(255,236,150,0.9)');
+      sun.addColorStop(1, 'rgba(255,236,150,0)');
+      g.fillStyle = sun;
+      g.fillRect(W - 370, -110, 280, 280);
+      g.fillStyle = 'rgba(255,255,255,0.85)';
+      for (const [cx, cy, k] of [
+        [220, 30, 1],
+        [520, 10, 0.7],
+        [-60, 50, 0.8],
+        [W + 80, 20, 0.9],
+      ]) {
+        for (const [dx, dy, r] of [
+          [0, 0, 26],
+          [26, -10, 22],
+          [52, 2, 20],
+          [-24, 6, 18],
+        ]) {
+          g.beginPath();
+          g.arc(cx + dx * k, cy + dy * k, r * k, 0, Math.PI * 2);
+          g.fill();
+        }
+      }
+    }
     for (let i = 0; i < stars; i++) {
       g.fillStyle = `rgba(255,255,255,${0.2 + rnd() * 0.6})`;
       const s = rnd() * 1.6 + 0.4;
@@ -336,9 +456,10 @@ export class Stadium {
     const top = GRASS_TOP;
     const bottom = H + this.my;
     const base = g.createLinearGradient(0, top, 0, bottom);
-    base.addColorStop(0, '#2f8f3a');
-    base.addColorStop(0.45, '#3fae45');
-    base.addColorStop(1, '#2a7d33');
+    const th = this.th;
+    base.addColorStop(0, th.grass[0]);
+    base.addColorStop(0.45, th.grass[1]);
+    base.addColorStop(1, th.grass[2]);
     g.fillStyle = base;
     g.fillRect(-m, top, W + m * 2, bottom - top);
 
@@ -352,7 +473,7 @@ export class Stadium {
       const x1 = x0 + sw;
       const f0 = W / 2 + (x0 - W / 2) * farK;
       const f1 = W / 2 + (x1 - W / 2) * farK;
-      g.fillStyle = 'rgba(255,255,255,0.055)';
+      g.fillStyle = th.stripe;
       g.beginPath();
       g.moveTo(f0, top);
       g.lineTo(f1, top);
@@ -368,12 +489,12 @@ export class Stadium {
     for (let i = 0; i < specks; i++) {
       const y = top + rnd() * (bottom - top);
       const x = -m + rnd() * (W + m * 2);
-      g.fillStyle = rnd() < 0.5 ? 'rgba(20,70,25,0.35)' : 'rgba(160,240,140,0.12)';
+      g.fillStyle = rnd() < 0.5 ? th.speckDark : th.speckLight;
       g.fillRect(x, y, 1.2, 2.5 + rnd() * 2);
     }
 
     // field markings
-    g.strokeStyle = 'rgba(255,255,255,0.75)';
+    g.strokeStyle = this.theme === 'snow' ? 'rgba(70,110,180,0.55)' : 'rgba(255,255,255,0.75)';
     g.lineWidth = 3;
     g.beginPath();
     g.moveTo(-m, top + 10);
@@ -426,6 +547,41 @@ export class Stadium {
   private drawOutside(g: CanvasRenderingContext2D): void {
     const mx = this.mx;
     const my = this.my;
+    if (this.theme === 'rain') {
+      g.fillStyle = 'rgba(190,215,255,0.12)';
+      for (const [x, y, w] of [
+        [180, 650, 90],
+        [470, 690, 140],
+        [820, 660, 110],
+        [1100, 700, 120],
+      ]) {
+        g.beginPath();
+        g.ellipse(x, y, w, w * 0.12, 0, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+    if (this.theme === 'beach') {
+      for (const [x, k] of [
+        [-70, 1],
+        [W + 70, -1],
+        [-210, 0.8],
+        [W + 210, -0.8],
+      ]) {
+        g.strokeStyle = '#7a5230';
+        g.lineWidth = 10 * Math.abs(k);
+        g.beginPath();
+        g.moveTo(x, 500);
+        g.quadraticCurveTo(x + 20 * k, 380, x - 10 * k, 300);
+        g.stroke();
+        g.fillStyle = '#2d8a3e';
+        for (let i = 0; i < 6; i++) {
+          const a = -Math.PI / 2 + (i - 2.5) * 0.55;
+          g.beginPath();
+          g.ellipse(x - 10 * k + Math.cos(a) * 45, 300 + Math.sin(a) * 25 + 15, 50 * Math.abs(k), 12, a, 0, Math.PI * 2);
+          g.fill();
+        }
+      }
+    }
     if (mx <= BG_MARGIN + 2) return;
     for (const side of [0, 1]) {
       const dir = side === 0 ? -1 : 1;
@@ -465,7 +621,7 @@ export class Stadium {
     // soft beams, drawn additively over the crowd and the pitch
     for (const lamp of LAMPS) {
       const grad = g.createLinearGradient(lamp.x, lamp.y, lamp.aimX, GROUND_Y);
-      grad.addColorStop(0, 'rgba(255,250,220,0.16)');
+      grad.addColorStop(0, `rgba(255,250,220,${0.16 * this.th.beams})`);
       grad.addColorStop(1, 'rgba(255,250,220,0)');
       g.fillStyle = grad;
       g.beginPath();

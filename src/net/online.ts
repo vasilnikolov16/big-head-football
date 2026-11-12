@@ -7,7 +7,7 @@ import { MatchTracker } from '../game/tracker';
 import { heroSelect, type OnlineSelectApi } from '../ui/heroSelect';
 import { lobbyScreen, onlineMenu, onlinePause, type OnlineMenuApi } from '../ui/onlineUi';
 import { postMatch } from '../ui/screens';
-import { cleanName, CODE_LEN, EMOTES, normalizeCode, type LobbyOptions, type MatchEnd, type Msg } from './protocol';
+import { cleanName, CODE_LEN, EMOTES, normalizeCode, type LobbyOptions, type MatchEnd, type Msg, cleanOpts } from './protocol';
 import { Room, RoomFailure, type LeaveReason } from './room';
 import { GuestInputSender, GuestSync, HostSync } from './sync';
 
@@ -149,7 +149,8 @@ export class OnlineSession {
     this.menuApi?.setBusy(true);
     this.menuApi?.setStatus(t('online.creating'), 'busy');
     try {
-      const room = await Room.create(name, { duration: g.settings.duration, powerups: g.settings.powerups });
+      const st = g.settings.stadium;
+      const room = await Room.create(name, { duration: g.settings.duration, powerups: g.settings.powerups, stadium: st === 'random' ? 'classic' : st });
       this.attach(room);
       this.note = '';
       this.showLobby();
@@ -237,7 +238,7 @@ export class OnlineSession {
   private setOpts(o: LobbyOptions): void {
     const room = this.room;
     if (!room || room.role !== 'host') return;
-    room.opts = { duration: o.duration, powerups: o.powerups };
+    room.opts = cleanOpts(o);
     // remember them as the defaults for next time
     this.game.settings.duration = o.duration;
     this.game.settings.powerups = o.powerups;
@@ -317,6 +318,7 @@ export class OnlineSession {
       tags: side === 0 ? [t('you'), ''] : ['', t('you')],
       duration: opts.duration,
       powerups: opts.powerups,
+      stadium: opts.stadium,
     };
   }
 
@@ -544,8 +546,7 @@ export class OnlineSession {
     switch (msg.t) {
       case 'opts':
         if (!host && this.room && msg.opts) {
-          const d = msg.opts.duration;
-          this.room.opts = { duration: d === 30 || d === 90 ? d : 60, powerups: msg.opts.powerups !== false };
+          this.room.opts = cleanOpts(msg.opts);
           this.lobbyRefresh?.();
         }
         return;
@@ -576,8 +577,7 @@ export class OnlineSession {
       case 'start': {
         if (host || !Array.isArray(msg.heroes)) return;
         const heroes = msg.heroes.map((h) => (CHARACTERS.some((c) => c.id === h) ? h : 'bobo')) as [string, string];
-        const d = msg.opts?.duration;
-        const opts: LobbyOptions = { duration: d === 30 || d === 90 ? d : 60, powerups: msg.opts?.powerups !== false };
+        const opts: LobbyOptions = cleanOpts(msg.opts);
         this.beginMatch(msg.mid, heroes, opts);
         return;
       }

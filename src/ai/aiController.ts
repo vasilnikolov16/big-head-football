@@ -170,8 +170,39 @@ export class AIController implements Controller {
   // ------------------------------------------------------------ prediction
 
   /** Fills `path` with the predicted ball flight; returns the number of points. */
+  /** the ball this AI cares about (with two balls: the more dangerous one) */
+  private target: Ball | null = null;
+
+  private get ball(): Ball {
+    return this.target ?? this.match.ball;
+  }
+
+  private pickBall(): void {
+    const m = this.match;
+    if (m.extraBalls.length === 0) {
+      this.target = null;
+      return;
+    }
+    const me = this.me;
+    const f = me.facing;
+    const ownWall = f === 1 ? 0 : W;
+    let best = m.ball;
+    let bestScore = Infinity;
+    for (const b of [m.ball, ...m.extraBalls]) {
+      // close to my goal and heading there = urgent; otherwise the nearest one
+      const fromGoal = (b.x - ownWall) * f;
+      const coming = b.vx * f < -100 ? -250 : 0;
+      const score = fromGoal < W / 2 ? fromGoal + coming : W + Math.abs(b.x - me.x);
+      if (score < bestScore) {
+        bestScore = score;
+        best = b;
+      }
+    }
+    this.target = best;
+  }
+
   private predict(seconds: number): number {
-    const b = this.match.ball;
+    const b = this.ball;
     const s = this.sim;
     s.x = b.x;
     s.y = b.y;
@@ -195,8 +226,9 @@ export class AIController implements Controller {
   // ------------------------------------------------------------ decisions
 
   private think(): void {
+    this.pickBall();
     const me = this.me;
-    const b = this.match.ball;
+    const b = this.ball;
     const f = me.facing;
     const ownWall = f === 1 ? 0 : W;
     const u = (x: number): number => (x - ownWall) * f; // distance from my own wall
@@ -333,7 +365,7 @@ export class AIController implements Controller {
   /** Precise kick: will the ball be at my foot's sweet spot when the swing gets there? */
   private kickCheck(): boolean {
     const me = this.me;
-    const b = this.match.ball;
+    const b = this.ball;
     if (!this.allowKick || (this.match.phase !== 'playing' && this.match.phase !== 'goal')) return false;
     const lead = KICK_LEAD + (this.difficulty === 'medium' ? rand(-0.02, 0.025) : 0);
     const bx = b.x + b.vx * lead;

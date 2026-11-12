@@ -10,6 +10,7 @@ import { ballVsPlayer, playerVsPlayer, separatePlayerFromBall } from './interact
 import { Player } from './player';
 import { PowerUps } from './powerups';
 import { SuperShot, updateDecoys, WINDUP, type Decoy } from './supers';
+import { makeEnv, type MatchRules, type StadiumId } from './stadiums';
 
 export type MatchPhase = 'kickoff' | 'playing' | 'goal' | 'ended';
 
@@ -21,6 +22,12 @@ export interface MatchConfig {
   duration: number; // seconds
   /** random power-ups on the pitch */
   powerups: boolean;
+  /** weather / stadium (classic when missing) */
+  stadium?: StadiumId;
+  /** crazy party rules */
+  rules?: MatchRules;
+  /** a draw at full time ends the match (league), instead of a golden goal */
+  allowDraw?: boolean;
 }
 
 /** Short text that pops up above a player (super shot names). */
@@ -95,12 +102,21 @@ export class Match {
   /** number of super shots fired per player */
   supersUsed: [number, number] = [0, 0];
   readonly powerups: PowerUps;
+  /** party mode "double ball": more balls (simple physics, no supers) */
+  readonly extraBalls: Ball[] = [];
+  private extraImpacts = makeImpactLog();
+  /** party mode "every kick is super": who kicked this step, and when each last fired */
+  private superKick = -1;
+  private superKickAt: [number, number] = [-9, -9];
 
   constructor(config: MatchConfig) {
     this.config = config;
     this.timeLeft = config.duration;
     this.powerups = new PowerUps(config.powerups);
     this.players = [new Player(0, config.chars[0]), new Player(1, config.chars[1])];
+    this.arena.env = makeEnv(config.stadium, config.rules);
+    if (config.rules?.doubleBall) this.extraBalls.push(new Ball());
+    if (config.rules?.allSuper) this.events.on('kick', (e) => (this.superKick = e.player));
     this.setupKickoff();
     this.bannerKey('banner.ready', '#ffffff', 1.0);
   }
@@ -123,6 +139,7 @@ export class Match {
     // After a goal the ball drops slightly towards the side that conceded (no kickoff goal loops).
     const shift = this.lastScorer < 0 ? 0 : this.lastScorer === 0 ? KICKOFF_SHIFT : -KICKOFF_SHIFT;
     this.ball.reset(W / 2 + shift, BALL_DROP_Y);
+    this.extraBalls.forEach((b, i) => b.reset(W / 2 - shift - (i % 2 ? -1 : 1) * 160, BALL_DROP_Y - 40));
     this.endSuper();
     this.decoys = [];
     this.powerups?.clearItems();
@@ -217,9 +234,14 @@ export class Match {
       // the ball hovers at the top, waiting for the whistle
       this.ball.y = BALL_DROP_Y + Math.sin(this.phaseT * 6) * 4;
       this.ball.angle += dt * 2;
+      for (const b of this.extraBalls) {
+        b.savePrev();
+        b.y = BALL_DROP_Y - 40 + Math.sin(this.phaseT * 6 + 1) * 4;
+      }
       if (this.phaseT >= KICKOFF_TIME) this.releaseBall();
     } else {
       this.stepBallAndContacts(dt);
+      this.stepExtraBalls(dt);
     }
 
     if (!hold) this.powerups.update(this, dt);
@@ -264,7 +286,7 @@ export class Match {
         if (sup.ignores(this, p, near)) continue;
       }
       const touchedBefore = b.lastTouch === p.index && b.sinceTouch === 0;
-      ballVsPlayer(b, p, this.events, this.players[1 - p.index]);
+      ballVsPlayer(b, p, this.events, this.players[1 - p.index], this.arena.env.noKicks);
       const touched = b.lastTouch === p.index && b.sinceTouch === 0 && !touchedBefore;
       if (touched) {
         this.touchAt[p.index] = this.time;
@@ -280,6 +302,18 @@ export class Match {
       }
     }
     this.checkClash(dt);
+    if (this.superKick >= 0) {
+      const k = this.superKick;
+      this.superKick = -1;
+      if (this.phase === 'playing' && !this.superShot && this.time - this.superKickAt[k] > 1.1) {
+        this.superKickAt[k] = this.time;
+        const p = this.players[k];
+        const shot = new SuperShot(p.char.super, p.index, this);
+        this.superShot = shot;
+        shot.begin(this);
+        shot.launchNow(this);
+      }
+    }
     collideBallWorld(b, this.arena, imp, dt);
     for (const p of this.players) {
       if (this.superShot && !this.superShot.done && this.superShot.ignores(this, p, false)) continue;
@@ -334,14 +368,37 @@ export class Match {
   }
 
   private checkGoal(): void {
-    const b = this.ball;
-    if (this.superShot?.hidden) return;
-    // The whole ball must cross the goal line, under the crossbar.
-    if (b.x + b.r < GOAL_DEPTH && b.y > this.arena.goalTop[0]) this.onGoal(1);
-    else if (b.x - b.r > W - GOAL_DEPTH && b.y > this.arena.goalTop[1]) this.onGoal(0);
+    for (const b of [this.ball, ...this.extraBalls]) {
+      if (b === this.ball && this.superShot?.hidden) continue;
+      // The whole ball must cross the goal line, under the crossbar.
+      if (b.x + b.r < GOAL_DEPTH && b.y > this.arena.goalTop[0]) {
+        this.onGoal(1, b);
+        return;
+      }
+      if (b.x - b.r > W - GOAL_DEPTH && b.y > this.arena.goalTop[1]) {
+        this.onGoal(0, b);
+        return;
+      }
+    }
   }
 
-  private onGoal(scorer: 0 | 1): void {
+  /** "double ball": the extra balls get the normal physics and contacts, without supers */
+  private stepExtraBalls(dt: number): void {
+    const noKicks = this.arena.env.noKicks;
+    for (const b of this.extraBalls) {
+      const imp = this.extraImpacts;
+      imp.ground = imp.wall = imp.bar = imp.ceiling = 0;
+      stepBall(b, this.arena, dt, imp);
+      for (const p of this.players) ballVsPlayer(b, p, this.events, this.players[1 - p.index], noKicks);
+      collideBallWorld(b, this.arena, imp, dt);
+      for (const p of this.players) separatePlayerFromBall(b, p);
+      for (const sf of ['ground', 'wall', 'bar', 'ceiling'] as Surface[]) {
+        if (imp[sf] > 70) this.events.emit('bounce', { surface: sf, x: b.x, y: b.y, speed: imp[sf] });
+      }
+    }
+  }
+
+  private onGoal(scorer: 0 | 1, ball: Ball = this.ball): void {
     this.score[scorer]++;
     this.lastScorer = scorer;
     this.phase = 'goal';
@@ -351,11 +408,11 @@ export class Match {
     this.endSuper();
     const golden = this.golden;
     this.bannerKey(golden ? 'banner.goldenGoal' : 'banner.goal', golden ? '#ffd23f' : '#ffffff', GOAL_TIME - 0.3, { player: scorer });
-    this.events.emit('goal', { scorer, x: this.ball.x, y: this.ball.y, golden });
+    this.events.emit('goal', { scorer, x: ball.x, y: ball.y, golden });
   }
 
   private onTimeUp(): void {
-    if (this.score[0] === this.score[1]) {
+    if (this.score[0] === this.score[1] && !this.config.allowDraw) {
       this.golden = true;
       this.events.emit('whistle', { kind: 'golden' });
       this.setupKickoff();

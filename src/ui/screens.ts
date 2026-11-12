@@ -4,10 +4,10 @@ import type { CareerResult } from '../game/career';
 import { getCharacter } from '../game/characters';
 import type { Match } from '../game/match';
 import { drawBall } from '../render/ballDraw';
-import { controlSetRow, difficultyRow, durationRow, type SettingsHost } from './settingsUi';
+import { controlSetRow, difficultyRow, durationRow, type SettingsHost, stadiumRow } from './settingsUi';
 import { button, h, keycap, type NavItem, type Screen } from './ui';
 
-export type MatchMode = 'cpu' | 'pvp' | 'tournament' | 'demo' | 'online';
+export type MatchMode = 'cpu' | 'pvp' | 'tournament' | 'demo' | 'online' | 'party' | 'league' | 'daily';
 
 /** What the screens can ask the game to do. */
 export interface AppActions extends SettingsHost {
@@ -20,6 +20,7 @@ export interface AppActions extends SettingsHost {
   showTournament(): void;
   showStats(): void;
   showOnline(): void;
+  showParty(): void;
   startPvp(): void;
   rematch(): void;
   changeHeroes(): void;
@@ -74,6 +75,7 @@ export function mainMenu(app: AppActions): Screen {
   const list = h('div', 'menu-list');
   const items: NavItem[] = [
     button(t('menu.cpu'), () => app.showCpuSetup()),
+    button(t('menu.party'), () => app.showParty()),
     button(t('menu.online'), () => app.showOnline(), 'btn', false, '🌐'),
     // two players need a keyboard (one phone screen is too small for 2 sets of buttons)
     button(t('menu.pvp'), () => app.startPvp(), 'btn', app.touchMode, app.touchMode ? t('keyboardOnly') : undefined),
@@ -104,9 +106,10 @@ export function cpuSetup(app: AppActions): Screen {
   updateDesc();
   const set = controlSetRow(app);
   const dur = durationRow(app);
+  const stadium = stadiumRow(app);
   const start = button(t('cpu.pick'), () => app.showHeroSelect('cpu'), 'btn btn-go');
-  const items = app.touchMode ? [diff, dur, start] : [diff, set, dur, start];
-  body.append(diff.el, desc, ...(app.touchMode ? [] : [set.el]), dur.el, h('div', 'row-buttons', undefined, [start.el]));
+  const items = app.touchMode ? [diff, dur, stadium, start] : [diff, set, dur, stadium, start];
+  body.append(diff.el, desc, ...(app.touchMode ? [] : [set.el]), dur.el, stadium.el, h('div', 'row-buttons', undefined, [start.el]));
   return { id: 'cpu', root, items, back: () => app.showMain(), initial: items.indexOf(start) };
 }
 
@@ -219,6 +222,12 @@ export function pauseScreen(app: AppActions): Screen {
 
 export interface PostMatchExtra {
   career: CareerResult | null;
+  /** one human against the computer (the result is told from their side) */
+  vsCpu?: boolean;
+  /** league / daily challenge: a single "continue" button */
+  continueOnly?: boolean;
+  /** a line under the title (league round, challenge result) */
+  note?: string;
   /** tournament: go back to the ladder (or the trophy) */
   onContinue?: () => void;
   online?: PostOnline;
@@ -242,7 +251,7 @@ export function postMatch(app: AppActions, m: Match, mode: MatchMode, extra: Pos
   let title: string;
   let cls: string;
   const online = extra.online;
-  if (mode === 'cpu' || mode === 'tournament' || online) {
+  if (mode === 'cpu' || mode === 'tournament' || extra.vsCpu || online) {
     const me = online?.side ?? 0;
     title = m.winner === me ? t('post.win') : m.winner === 1 - me ? t('post.lose') : t('post.draw');
     cls = m.winner === me ? 'win' : m.winner === 1 - me ? 'lose' : 'draw';
@@ -313,6 +322,8 @@ export function postMatch(app: AppActions, m: Match, mode: MatchMode, extra: Pos
       rem.el.classList.toggle('btn-go', !iWant);
       rem.el.classList.toggle('btn-alt', iWant);
     });
+  } else if (extra.continueOnly) {
+    items = [button(t('post.continue'), () => extra.onContinue?.(), 'btn btn-go'), button(t('post.menu'), () => app.quitToMenu(), 'btn btn-alt')];
   } else if (mode === 'tournament') {
     const won = m.winner === 0;
     items = won

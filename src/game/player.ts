@@ -240,9 +240,11 @@ export class Player {
     if (this.dashT > 0) {
       this.dashT = Math.max(0, this.dashT - dt);
     } else {
-      const target = move * this.maxSpeed * (this.slowT > 0 ? 0.5 : 1);
+      const env = arena.env;
+      const target = move * this.maxSpeed * env.runMul * (this.slowT > 0 ? 0.5 : 1);
       let accel: number;
-      if (this.grounded) accel = move !== 0 ? 4300 : 3800;
+      // slippery ground (rain) = less grip, both to speed up and to stop
+      if (this.grounded) accel = (move !== 0 ? 4300 : 3800) * env.grip;
       else accel = move !== 0 ? 2700 : 700;
       if (move !== 0 && Math.sign(this.vx) === -move) accel *= 1.7;
       // coming out of a dash: bleed the extra speed off quickly but not instantly
@@ -255,7 +257,7 @@ export class Player {
     this.coyote = this.grounded ? COYOTE : this.coyote - dt;
     if (this.jumpBuffer > 0 && this.coyote > 0) {
       const boost = this.jumpBoostT > 0 ? 1.28 : 1;
-      this.vy = -this.jumpV * boost;
+      this.vy = -this.jumpV * boost * arena.env.jumpMul;
       this.grounded = false;
       this.coyote = 0;
       this.jumpBuffer = 0;
@@ -265,7 +267,7 @@ export class Player {
     }
     this.jumpBuffer -= dt;
 
-    let g = PLAYER_GRAVITY;
+    let g = PLAYER_GRAVITY * arena.env.playerGravity;
     if (this.vy < 0 && !intent.jumpHeld) g *= 2.1; // short hop when jump released
     else if (this.vy > 0) g *= 1.18; // fall a bit faster than rise
     this.vy = Math.min(this.vy + g * dt, 1700);

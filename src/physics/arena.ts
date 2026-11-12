@@ -1,5 +1,6 @@
 import { BAR_THICK, GOAL_DEPTH, GOAL_TOP, W } from '../core/constants';
 import type { Rect } from './collide';
+import { BASE_ENV, type Env } from '../game/stadiums';
 
 /**
  * Static level geometry: floor, side walls, ceiling and the two crossbars.
@@ -8,6 +9,8 @@ import type { Rect } from './collide';
 export class Arena {
   /** y of the crossbar centre for [left goal, right goal] */
   readonly defaultGoalTop = GOAL_TOP;
+  /** weather + party rules: how the ball and the players behave here */
+  env: Env = { ...BASE_ENV };
   goalTop: [number, number] = [GOAL_TOP, GOAL_TOP];
   bars: [Rect, Rect] = [
     { x: 0, y: 0, w: 0, h: 0 },

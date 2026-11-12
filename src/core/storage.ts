@@ -1,5 +1,6 @@
 import type { Difficulty } from '../ai/aiController';
 import type { Lang } from '../i18n/i18n';
+import { PARTY_IDS, STADIUM_IDS, type PartyMode, type StadiumId } from '../game/stadiums';
 import { ACTIONS, cloneBinding, DEFAULT_P1, DEFAULT_P2, type Binding } from '../input/controls';
 
 /** where the player put each on-screen button: centre as a fraction of the screen */
@@ -19,6 +20,11 @@ export interface Settings {
   musicVolume: number;
   /** crowd noise, 0..1 */
   crowdVolume: number;
+  /** stadium for local matches ('random' picks one each match) */
+  stadium: StadiumId | 'random';
+  /** crazy modes: last mode and opponent */
+  party: PartyMode;
+  partyTwo: boolean;
   powerups: boolean;
   replays: boolean;
   lang: Lang;
@@ -58,6 +64,9 @@ const defaults = (): Settings => ({
   sfxVolume: 0.8,
   musicVolume: 0.5,
   crowdVolume: 0.7,
+  stadium: 'classic',
+  party: 'heads',
+  partyTwo: false,
   powerups: true,
   replays: false,
   lang: 'bg',
@@ -135,6 +144,9 @@ export function loadSettings(): Settings {
   if (!['auto', 'on', 'off'].includes(s.touch)) s.touch = 'auto';
   s.showFps = s.showFps === true;
   s.crowdVolume = clamp01(s.crowdVolume, d.crowdVolume);
+  if (s.stadium !== 'random' && !STADIUM_IDS.includes(s.stadium)) s.stadium = 'classic';
+  if (!PARTY_IDS.includes(s.party)) s.party = 'heads';
+  s.partyTwo = s.partyTwo === true;
   s.shake = s.shake !== false;
   s.cinematic = s.cinematic !== false;
   if (!['high', 'normal', 'saver'].includes(s.quality)) s.quality = 'high';

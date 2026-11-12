@@ -148,6 +148,14 @@ export class SuperShot {
     }
   }
 
+  /** skip the wind-up (party mode "every kick is super") */
+  launchNow(m: Match): void {
+    this.phase = 0;
+    this.t = 0;
+    this.start(m);
+    m.launchSuper(this);
+  }
+
   start(m: Match): void {
     const b = m.ball;
     this.x0 = b.x;

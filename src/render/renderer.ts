@@ -1,4 +1,4 @@
-import { FONT_DISPLAY, FONT_TEXT, H, INK, SCREEN, W } from '../core/constants';
+import { FONT_DISPLAY, FONT_TEXT, GROUND_Y, H, INK, SCREEN, W } from '../core/constants';
 import { clamp, easeOutBack, lerp } from '../core/math';
 import { t as tx } from '../i18n/i18n';
 import { drawBall, drawBallShadow } from './ballDraw';
@@ -160,6 +160,8 @@ export class Renderer {
     }
 
     const st = this.stadium;
+    const stadiumId = m.config.stadium ?? 'classic';
+    if (st.theme !== stadiumId) st.setTheme(stadiumId);
     st.drawBackground(ctx);
     st.drawCrowd(ctx, t);
     st.drawBoards(ctx, t);
@@ -183,6 +185,8 @@ export class Renderer {
     drawPlayerShadow(ctx, m.players[0], alpha);
     drawPlayerShadow(ctx, m.players[1], alpha);
     if (!hidden) drawBallShadow(ctx, bx, by, br);
+    const extra = m.extraBalls ?? [];
+    for (const e of extra) drawBallShadow(ctx, lerp(e.px, e.x, alpha), lerp(e.py, e.y, alpha), e.r);
 
     drawPowerItems(ctx, m.powerups.items, alpha, t);
     this.drawArmBursts(ctx, m, t, true);
@@ -200,8 +204,12 @@ export class Renderer {
       if (glow) this.drawGlow(ctx, bx, by, br, glow);
       drawBall(ctx, bx, by, br, ba);
     }
+    for (const e of extra) drawBall(ctx, lerp(e.px, e.x, alpha), lerp(e.py, e.y, alpha), e.r, lerp(e.pangle, e.angle, alpha));
+    {
+    }
     sfx.drawFront(ctx, m, bx, by, br, t);
     fx.particles.draw(ctx);
+    this.drawWeather(ctx, stadiumId, t);
     this.drawEmotes(ctx, m, alpha);
 
     drawCrossbar(ctx, 0, m.arena, fx.barFlash[0]);
@@ -301,6 +309,52 @@ export class Renderer {
       ctx.fillText(e.icon, 0, 1);
       ctx.restore();
     }
+  }
+
+  /** Rain or snow falling over the whole screen. */
+  private drawWeather(ctx: CanvasRenderingContext2D, id: string, t: number): void {
+    if (id !== 'rain' && id !== 'snow') return;
+    const S = SCREEN;
+    ctx.save();
+    if (id === 'rain') {
+      ctx.strokeStyle = 'rgba(190,210,240,0.45)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      for (let i = 0; i < 170; i++) {
+        const a = (i * 0.6180339) % 1;
+        const b = (i * 0.7548776) % 1;
+        const y = S.y + ((b * S.h + t * (1300 + a * 300)) % (S.h + 40)) - 20;
+        const x = S.x + ((a * S.w * 1.3 - t * 260 + S.w * 2) % (S.w * 1.3)) - S.w * 0.15;
+        ctx.moveTo(x, y);
+        ctx.lineTo(x - 5, y + 20);
+      }
+      ctx.stroke();
+      // splashes on the pitch
+      ctx.strokeStyle = 'rgba(200,220,255,0.5)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      for (let i = 0; i < 14; i++) {
+        const k = (t * 3 + i * 0.37) % 1;
+        const x = S.x + ((i * 0.618 * S.w + Math.floor(t * 3 + i * 0.37) * 337) % S.w);
+        ctx.moveTo(x - 4 - k * 8, GROUND_Y + 4);
+        ctx.quadraticCurveTo(x, GROUND_Y - 6 * (1 - k), x + 4 + k * 8, GROUND_Y + 4);
+      }
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.beginPath();
+      for (let i = 0; i < 130; i++) {
+        const a = (i * 0.6180339) % 1;
+        const b = (i * 0.7548776) % 1;
+        const r = 1.4 + a * 2.4;
+        const y = S.y + ((b * S.h + t * (40 + r * 22)) % (S.h + 20)) - 10;
+        const x = S.x + a * S.w + Math.sin(t * 0.9 + i) * 18;
+        ctx.moveTo(x + r, y);
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+      }
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   /** Ping pill (top-right) and the "waiting for…" note. */

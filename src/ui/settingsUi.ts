@@ -1,6 +1,7 @@
 import type { Difficulty } from '../ai/aiController';
 import type { Settings } from '../core/storage';
-import { getLang, setLang, t, type Lang } from '../i18n/i18n';
+import { getLang, setLang, t, tr, type Lang } from '../i18n/i18n';
+import { STADIUM_IDS, STADIUMS, type StadiumId } from '../game/stadiums';
 import {
   ACTION_KEYS,
   ACTIONS,
@@ -67,6 +68,19 @@ export function difficultyRow(host: SettingsHost, label = t('settings.cpuDiff'),
     host.saveSettings();
     after?.();
   });
+}
+
+/** Stadium (weather) for local matches. */
+export function stadiumRow(host: SettingsHost): NavItem {
+  return optionRow<StadiumId | 'random'>(
+    t('stadium'),
+    [...STADIUM_IDS.map((id) => ({ value: id as StadiumId | 'random', label: STADIUMS[id].icon + ' ' + tr(STADIUMS[id].name) })), { value: 'random', label: '🎲 ' + t('stadium.random') }],
+    () => host.settings.stadium,
+    (v) => {
+      host.settings.stadium = v;
+      host.saveSettings();
+    },
+  );
 }
 
 export function controlSetRow(host: SettingsHost): NavItem {

@@ -1,4 +1,5 @@
-import { t } from '../i18n/i18n';
+import { t, tr } from '../i18n/i18n';
+import { STADIUM_IDS, STADIUMS, type StadiumId } from '../game/stadiums';
 import { CODE_LEN, MAX_NAME, cleanName, normalizeCode, type LobbyOptions } from '../net/protocol';
 import { button, h, optionRow, textRow, type NavItem, type Screen } from './ui';
 
@@ -163,6 +164,8 @@ export function lobbyScreen(o: LobbyOptionsUi): { screen: Screen; refresh: () =>
   let puItem: NavItem | null = null;
   const durLabel = h('span', 'opt-chip on');
   const puLabel = h('span', 'opt-chip on');
+  const stLabel = h('span', 'opt-chip on');
+  let stItem: NavItem | null = null;
   if (st0.isHost) {
     durItem = optionRow(
       t('cpu.duration'),
@@ -179,13 +182,21 @@ export function lobbyScreen(o: LobbyOptionsUi): { screen: Screen; refresh: () =>
       () => o.get().opts.powerups,
       (v) => o.setOpts({ ...o.get().opts, powerups: v }),
     );
-    setBox.append(durItem.el, puItem.el);
+    stItem = optionRow<StadiumId>(
+      t('stadium'),
+      STADIUM_IDS.map((id) => ({ value: id, label: STADIUMS[id].icon + ' ' + tr(STADIUMS[id].name) })),
+      () => o.get().opts.stadium,
+      (v) => o.setOpts({ ...o.get().opts, stadium: v }),
+    );
+    setBox.append(durItem.el, puItem.el, stItem.el);
   } else {
     const r1 = h('div', 'opt-row static');
     r1.append(h('span', 'opt-label', t('cpu.duration')), h('div', 'opt-seg', undefined, [durLabel]));
     const r2 = h('div', 'opt-row static');
     r2.append(h('span', 'opt-label', t('settings.powerups')), h('div', 'opt-seg', undefined, [puLabel]));
-    setBox.append(r1, r2, h('p', 'desc small', t('online.hostPicks')));
+    const r3 = h('div', 'opt-row static');
+    r3.append(h('span', 'opt-label', t('stadium')), h('div', 'opt-seg', undefined, [stLabel]));
+    setBox.append(r1, r2, r3, h('p', 'desc small', t('online.hostPicks')));
   }
 
   const note = h('div', 'net-status info');
@@ -194,7 +205,7 @@ export function lobbyScreen(o: LobbyOptionsUi): { screen: Screen; refresh: () =>
   const grid = h('div', 'lobby-grid', undefined, [codeBox, h('div', 'lobby-side', undefined, [players, setBox])]);
   body.append(grid, note, h('div', 'row-buttons', undefined, st0.isHost ? [go.el, leave.el] : [leave.el]));
 
-  if (st0.isHost) items.push(go, durItem!, puItem!, copyCode, copyLink, leave);
+  if (st0.isHost) items.push(go, durItem!, puItem!, stItem!, copyCode, copyLink, leave);
   else items.push(copyCode, copyLink, leave);
 
   let hadGuest = !!st0.remoteName;
@@ -222,6 +233,8 @@ export function lobbyScreen(o: LobbyOptionsUi): { screen: Screen; refresh: () =>
     fill(rowGuest, guestName, false, !s.isHost);
     durLabel.textContent = t('sec', { n: s.opts.duration });
     puLabel.textContent = s.opts.powerups ? t('on') : t('off');
+    const sti = STADIUMS[s.opts.stadium] ?? STADIUMS.classic;
+    stLabel.textContent = sti.icon + ' ' + tr(sti.name);
     note.textContent = s.note;
     note.style.display = s.note ? '' : 'none';
     if (s.isHost) setDisabled(go, !s.remoteName);

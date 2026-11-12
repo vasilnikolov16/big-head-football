@@ -16,7 +16,7 @@ const MAGNUS = 0.0022;
 const AIR_DRAG_LINEAR = 0.3; // 1/s
 const AIR_DRAG_QUAD = 0.00018; // 1/px
 const ROLL_RESIST = 0.9; // 1/s, damping while rolling on the ground
-const ROLL_DECEL = 60; // px/s², constant rolling friction on grass
+// constant rolling friction comes from the stadium (arena.env.rollDecel)
 
 export class Ball {
   x = W / 2;
@@ -124,7 +124,7 @@ export function collideBallWorld(b: Ball, arena: Arena, impacts: ImpactLog, h: n
     tmp.nx = 0;
     tmp.ny = -1;
     tmp.pen = b.y + r - GROUND_Y;
-    const s = resolveBallContact(b, tmp, 0.86, 0.45);
+    const s = resolveBallContact(b, tmp, arena.env.groundBounce, arena.env.groundFriction);
     impacts.ground = Math.max(impacts.ground, s);
     b.grounded = true;
   }
@@ -164,6 +164,7 @@ export function collideBallWorld(b: Ball, arena: Arena, impacts: ImpactLog, h: n
 
 /** Integrate the ball one step (with sub-steps so it never tunnels). */
 export function stepBall(b: Ball, arena: Arena, dt: number, impacts: ImpactLog): void {
+  const env = arena.env;
   const speed = b.speed;
   const n = Math.max(1, Math.ceil((speed * dt) / (b.r * 0.35)));
   const h = dt / n;
@@ -171,9 +172,9 @@ export function stepBall(b: Ball, arena: Arena, dt: number, impacts: ImpactLog):
     const v = Math.hypot(b.vx, b.vy);
     // Gravity + Magnus lift (spin bends the flight)
     let ax = -MAGNUS * b.spin * b.vy;
-    let ay = BALL_GRAVITY * b.gravityScale + MAGNUS * b.spin * b.vx;
+    let ay = BALL_GRAVITY * b.gravityScale * env.ballGravity + MAGNUS * b.spin * b.vx;
     // Air drag (linear + quadratic)
-    const drag = (AIR_DRAG_LINEAR + AIR_DRAG_QUAD * v) * b.dragScale;
+    const drag = (AIR_DRAG_LINEAR + AIR_DRAG_QUAD * v) * b.dragScale * env.dragMul;
     ax -= b.vx * drag;
     ay -= b.vy * drag;
     b.vx += ax * h;
@@ -184,7 +185,7 @@ export function stepBall(b: Ball, arena: Arena, dt: number, impacts: ImpactLog):
     collideBallWorld(b, arena, impacts, h);
     if (b.grounded) {
       const k = Math.exp(-ROLL_RESIST * h);
-      b.vx = approach(b.vx * k, 0, ROLL_DECEL * h);
+      b.vx = approach(b.vx * k, 0, env.rollDecel * h);
       b.spin *= k;
       if (Math.abs(b.vx) < 2) b.vx = 0;
     } else {

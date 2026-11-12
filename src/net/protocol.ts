@@ -1,9 +1,10 @@
 import type { GameEvents } from '../core/events';
+import { STADIUM_IDS, type StadiumId } from '../game/stadiums';
 import type { PlayerMatchStats } from '../game/player';
 import type { MatchSummary } from '../game/tracker';
 
 /** Bump when the messages change: players on different versions can't play together. */
-export const PROTOCOL = 4;
+export const PROTOCOL = 5;
 /** Public signalling ids are global: prefix them so we never collide with other apps. */
 export const ROOM_PREFIX = 'kratunball-r1-';
 /** No I, O, 0, 1: nothing that can be misread when a code is dictated. */
@@ -15,6 +16,17 @@ export type Role = 'host' | 'guest';
 export interface LobbyOptions {
   duration: 30 | 60 | 90;
   powerups: boolean;
+  stadium: StadiumId;
+}
+
+/** keeps only what is valid from options received over the network */
+export function cleanOpts(o: Partial<LobbyOptions> | undefined): LobbyOptions {
+  const d = o?.duration;
+  return {
+    duration: d === 30 || d === 90 ? d : 60,
+    powerups: o?.powerups !== false,
+    stadium: o?.stadium && STADIUM_IDS.includes(o.stadium) ? o.stadium : 'classic',
+  };
 }
 
 export const EVENT_NAMES = [

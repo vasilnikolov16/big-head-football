@@ -1,6 +1,7 @@
 import type { Match } from '../game/match';
 import type { ActiveEffect, PowerItem } from '../game/powerups';
 import type { SuperShot } from '../game/supers';
+import type { Ball } from '../physics/ball';
 
 /**
  * What the renderer needs to draw a frame. A live Match satisfies it, and so
@@ -11,5 +12,7 @@ export type RenderView = Pick<
   'arena' | 'ball' | 'players' | 'decoys' | 'shockwave' | 'callout' | 'banner' | 'config' | 'score' | 'timeLeft' | 'golden' | 'phase'
 > & {
   superShot: SuperShot | null;
+  /** party mode "double ball" */
+  extraBalls?: Ball[];
   powerups: { items: PowerItem[]; active: ActiveEffect[] };
 };
