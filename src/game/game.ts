@@ -423,7 +423,8 @@ export class Game implements AppActions {
     this.startMatch({
       mode: 'league',
       chars: [getCharacter(run.hero), getCharacter(opp.hero)],
-      difficulty: run.stage === 'season' ? run.difficulty : run.difficulty === 'easy' ? 'medium' : 'hard',
+      // play-offs are a step harder (expert stays expert)
+      difficulty: run.stage === 'season' ? run.difficulty : run.difficulty === 'easy' ? 'medium' : run.difficulty === 'expert' ? 'expert' : 'hard',
       humanScheme: this.settings.humanScheme,
       duration: this.settings.duration,
       allowDraw: run.stage === 'season',
@@ -518,7 +519,7 @@ export class Game implements AppActions {
     );
   }
 
-  showTournament(): void {
+  showTournament(instant = false): void {
     if (this.setup?.mode !== 'demo') this.startDemo();
     if (!this.career.p.tournament) {
       this.showHeroSelect('tournament');
@@ -527,12 +528,20 @@ export class Game implements AppActions {
     this.ui.show(
       tournamentScreen(this.career, {
         play: () => this.playTournamentRound(),
+        setExpert: (on) => {
+          const run = this.career.p.tournament;
+          if (!run || run.round > 0) return;
+          run.expert = on;
+          this.career.save();
+          this.showTournament(true);
+        },
         restart: () => {
           this.career.abandonTournament();
           this.showHeroSelect('tournament');
         },
         back: () => this.showMain(),
       }),
+      instant,
     );
   }
 
@@ -543,7 +552,7 @@ export class Game implements AppActions {
     this.startMatch({
       mode: 'tournament',
       chars: [getCharacter(run.hero), getCharacter(run.order[run.round])],
-      difficulty: TOURNAMENT_DIFFICULTY(run.round),
+      difficulty: TOURNAMENT_DIFFICULTY(run.round, run.expert),
       humanScheme: this.settings.humanScheme,
       duration: this.settings.duration,
     });

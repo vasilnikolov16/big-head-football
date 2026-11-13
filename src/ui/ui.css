@@ -1468,6 +1468,11 @@
 .d-hard {
   background: #ff6b6b;
 }
+.d-expert {
+  background: linear-gradient(90deg, #c77dff, #ff4d9d);
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
 .rung-check {
   position: absolute;
   top: -12px;

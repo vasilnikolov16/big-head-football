@@ -13,7 +13,7 @@ import { circleRect, makeContact, type Contact } from './collide';
 /** Moment of inertia factor for a hollow sphere: I = k·m·r² */
 const INERTIA_K = 2 / 3;
 const MAGNUS = 0.0022;
-const AIR_DRAG_LINEAR = 0.3; // 1/s
+const AIR_DRAG_LINEAR = 0.33; // 1/s
 const AIR_DRAG_QUAD = 0.00018; // 1/px
 const ROLL_RESIST = 0.9; // 1/s, damping while rolling on the ground
 // constant rolling friction comes from the stadium (arena.env.rollDecel)
@@ -44,6 +44,9 @@ export class Ball {
   /** seconds the ball keeps burning (fire-ball power-up) */
   fireT = 0;
   fireOwner = -1;
+  /** seconds the ball has been sitting on top of a crossbar (see Match.checkBarStall) */
+  barT = 0;
+  barX = 0;
 
   reset(x: number, y: number): void {
     this.x = this.px = x;
@@ -56,6 +59,7 @@ export class Ball {
     this.fireOwner = -1;
     this.ghostT = 0;
     this.dragScale = 1;
+    this.barT = 0;
   }
 
   savePrev(): void {

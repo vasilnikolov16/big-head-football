@@ -27,7 +27,7 @@ export const DT = 1 / SIM_HZ;
 // Ball
 export const BALL_R = 21;
 /** low: the ball floats like a beach ball */
-export const BALL_GRAVITY = 900;
+export const BALL_GRAVITY = 860;
 export const MAX_BALL_SPEED = 1900;
 
 // Players

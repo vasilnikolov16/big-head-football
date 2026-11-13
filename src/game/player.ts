@@ -63,6 +63,10 @@ export class Player {
   // kick
   kickT = -1;
   kickHit = false;
+  /** this swing already caught the other player */
+  kickHitPlayer = false;
+  /** seconds a kicked player can't be kicked again (no stun-locking) */
+  kickImmuneT = 0;
   private kickCooldown = 0;
   footAngle = KICK_REST_ANGLE;
   footX = 0;
@@ -285,6 +289,7 @@ export class Player {
     if (!frozen && intent.kickPressed && this.kickT < 0 && this.kickCooldown <= 0) {
       this.kickT = 0;
       this.kickHit = false;
+      this.kickHitPlayer = false;
       this.stats.kicks++;
     }
     if (this.kickT >= 0) {
@@ -298,6 +303,7 @@ export class Player {
 
     // --- timers & animation ---
     this.stunT = Math.max(0, this.stunT - dt);
+    this.kickImmuneT = Math.max(0, this.kickImmuneT - dt);
     this.frozenT = Math.max(0, this.frozenT - dt);
     this.reversedT = Math.max(0, this.reversedT - dt);
     this.jumpBoostT = Math.max(0, this.jumpBoostT - dt);

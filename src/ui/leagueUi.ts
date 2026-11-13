@@ -38,6 +38,7 @@ export function leagueScreen(o: LeagueOptions): Screen {
         { value: 'easy', label: t('diff.easy') },
         { value: 'medium', label: t('diff.medium') },
         { value: 'hard', label: t('diff.hard') },
+        { value: 'expert', label: t('diff.expert') },
       ],
       o.difficulty,
       (v) => o.setDifficulty(v),

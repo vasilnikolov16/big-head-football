@@ -40,6 +40,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'lightning', icon: '🚀', name: { bg: 'Светкавица', en: 'Lightning' }, desc: { bg: 'Вкарай до 3 секунди след началния удар.', en: 'Score within 3 seconds of kick-off.' } },
   { id: 'rout', icon: '💥', name: { bg: 'Разгром', en: 'Rout' }, desc: { bg: 'Спечели с 5 или повече гола разлика.', en: 'Win by 5 or more goals.' } },
   { id: 'no_mercy', icon: '😈', name: { bg: 'Без милост', en: 'No mercy' }, desc: { bg: 'Победи компютъра на „Трудно“.', en: 'Beat the computer on Hard.' } },
+  { id: 'expert_win', icon: '🧠', name: { bg: 'По-умен от машината', en: 'Smarter than the machine' }, desc: { bg: 'Победи компютъра на „Експерт“.', en: 'Beat the computer on Expert.' } },
   { id: 'streak3', icon: '🔥', name: { bg: 'В серия', en: 'On fire' }, desc: { bg: '3 поредни победи срещу компютъра.', en: '3 wins in a row against the computer.' } },
   { id: 'online_win', icon: '🌐', name: { bg: 'Световна звезда', en: 'World star' }, desc: { bg: 'Спечели онлайн мач.', en: 'Win an online match.' } },
   { id: 'blocker', icon: '🛡️', name: { bg: 'Стена', en: 'The Wall' }, desc: { bg: 'Спри 5 супер удара.', en: 'Stop 5 super shots.' } },
@@ -57,7 +58,9 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'full_squad', icon: '🧑‍🤝‍🧑', name: { bg: 'Пълен отбор', en: 'Full squad' }, desc: { bg: 'Отключи всички герои.', en: 'Unlock every hero.' } },
 ];
 
-export const TOURNAMENT_DIFFICULTY = (round: number): Difficulty => (round < 2 ? 'easy' : round < 5 ? 'medium' : 'hard');
+const EXPERT_LADDER: Difficulty[] = ['medium', 'medium', 'hard', 'hard', 'hard', 'expert', 'expert'];
+export const TOURNAMENT_DIFFICULTY = (round: number, expert = false): Difficulty =>
+  expert ? EXPERT_LADDER[Math.min(round, EXPERT_LADDER.length - 1)] : round < 2 ? 'easy' : round < 5 ? 'medium' : 'hard';
 
 /** coins for every achievement */
 export const ACHIEVEMENT_COINS = 50;
@@ -333,7 +336,8 @@ export class Career {
       if (st.powerups >= 15) this.award('hunter', a);
       if (s.fastestGoal[h] > 0 && s.fastestGoal[h] <= 3) this.award('lightning', a);
       if (won && goals - against >= 5) this.award('rout', a);
-      if (won && vsCpu && info.difficulty === 'hard') this.award('no_mercy', a);
+      if (won && vsCpu && (info.difficulty === 'hard' || info.difficulty === 'expert')) this.award('no_mercy', a);
+      if (won && vsCpu && info.difficulty === 'expert') this.award('expert_win', a);
       if (vsCpu && st.streak >= 3) this.award('streak3', a);
 
       // new: blocks, stadiums, crazy modes, heroes tried
@@ -348,7 +352,7 @@ export class Career {
       // coins
       const draw = s.winner < 0;
       if (vsCpu || (info.mode === 'party' && info.humans.length === 1)) {
-        const bonus = info.difficulty === 'hard' ? 30 : info.difficulty === 'medium' ? 15 : 0;
+        const bonus = info.difficulty === 'expert' ? 55 : info.difficulty === 'hard' ? 30 : info.difficulty === 'medium' ? 15 : 0;
         coins += won ? 40 + bonus : draw ? 15 : 8;
         coins += goals * 5 + s.superGoals[h] * 5 + (won && against === 0 ? 10 : 0);
       } else if (online) {
@@ -371,7 +375,7 @@ export class Career {
           res.cupWon = true;
           res.flawless = run.losses === 0;
           st.cupsWon++;
-          coins += 300;
+          coins += run.expert ? 600 : 300;
           this.award('champion', res.achievements);
           if (res.flawless) this.award('flawless', res.achievements);
           this.p.tournament = null;

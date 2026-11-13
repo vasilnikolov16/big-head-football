@@ -3,12 +3,12 @@ import { TOURNAMENT_DIFFICULTY, type Career } from '../game/career';
 import { getCharacter } from '../game/characters';
 import { t, tr } from '../i18n/i18n';
 import { heroPortrait } from './portrait';
-import { button, h, type NavItem, type Screen } from './ui';
+import { button, h, optionRow, type NavItem, type Screen } from './ui';
 
 /** The tournament ladder: your hero, the 7 opponents and the next match. */
 export function tournamentScreen(
   career: Career,
-  actions: { play: () => void; restart: () => void; back: () => void },
+  actions: { play: () => void; restart: () => void; back: () => void; setExpert: (on: boolean) => void },
 ): Screen {
   const run = career.p.tournament!;
   const me = getCharacter(run.hero);
@@ -16,7 +16,20 @@ export function tournamentScreen(
   const box = h('div', 'panel');
   root.append(box);
   box.append(h('h2', 'panel-title', '🏆 ' + t('tour.title')));
-  box.append(h('p', 'desc', t('tour.sub', { n: run.order.length })));
+  box.append(h('p', 'desc', t(run.expert ? 'tour.subExpert' : 'tour.sub', { n: run.order.length })));
+  // the level can be picked until the first match is won
+  const level =
+    run.round === 0
+      ? optionRow<boolean>(
+          t('tour.level'),
+          [
+            { value: false, label: t('tour.normal') },
+            { value: true, label: t('tour.expert') },
+          ],
+          () => run.expert === true,
+          (v) => actions.setExpert(v),
+        )
+      : null;
 
   const head = h('div', 'tour-head');
   head.append(
@@ -38,12 +51,13 @@ export function tournamentScreen(
       h('div', 'rung-round', i === run.order.length - 1 ? t('tour.final') : t('tour.round', { n: i + 1 })),
       heroPortrait(c, 74, { silhouette: locked && state !== 'done' }),
       h('div', 'rung-name', locked && state !== 'done' ? '???' : tr(c.name)),
-      h('div', `rung-diff d-${TOURNAMENT_DIFFICULTY(i)}`, t(`diff.${TOURNAMENT_DIFFICULTY(i)}`)),
+      h('div', `rung-diff d-${TOURNAMENT_DIFFICULTY(i, run.expert)}`, t(`diff.${TOURNAMENT_DIFFICULTY(i, run.expert)}`)),
     );
     if (state === 'done') card.append(h('div', 'rung-check', '✓'));
     if (locked && state !== 'done') card.title = t('tour.lockedOpp');
     ladder.append(card);
   });
+  if (level) box.append(level.el);
   box.append(ladder);
 
   const last = run.round === run.order.length - 1;
@@ -61,9 +75,10 @@ export function tournamentScreen(
     },
     'btn btn-alt btn-small',
   );
-  const items: NavItem[] = [play, fresh];
-  box.append(h('div', 'row-buttons', undefined, items.map((i) => i.el)));
-  return { id: 'tournament', root, items, back: actions.back };
+  const buttons: NavItem[] = [play, fresh];
+  box.append(h('div', 'row-buttons', undefined, buttons.map((i) => i.el)));
+  const items: NavItem[] = level ? [level, ...buttons] : buttons;
+  return { id: 'tournament', root, items, back: actions.back, initial: items.indexOf(play) };
 }
 
 /** Draws a shiny golden cup (procedural, no images). */

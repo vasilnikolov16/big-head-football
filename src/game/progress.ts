@@ -15,7 +15,7 @@ export interface LeagueTeam {
 
 export interface LeagueRun {
   hero: string;
-  difficulty: 'easy' | 'medium' | 'hard';
+  difficulty: 'easy' | 'medium' | 'hard' | 'expert';
   teams: LeagueTeam[];
   /** round-robin pairs per round (indices into teams; team 0 is the player) */
   rounds: Array<Array<[number, number]>>;
@@ -72,6 +72,8 @@ export interface TournamentRun {
   /** index of the next round to play */
   round: number;
   losses: number;
+  /** the expert ladder: tougher opponents, a bigger prize */
+  expert?: boolean;
 }
 
 export interface Progress {

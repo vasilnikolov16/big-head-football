@@ -47,6 +47,7 @@ const difficulties = (): Array<{ value: Difficulty; label: string }> => [
   { value: 'easy', label: t('diff.easy') },
   { value: 'medium', label: t('diff.medium') },
   { value: 'hard', label: t('diff.hard') },
+  { value: 'expert', label: t('diff.expert') },
 ];
 
 const onOff = (): Array<{ value: boolean; label: string }> => [

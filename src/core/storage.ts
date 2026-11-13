@@ -132,7 +132,7 @@ export function loadSettings(): Settings {
   };
   if (![30, 60, 90].includes(s.duration)) s.duration = 60;
   if (s.humanScheme !== 'wasd' && s.humanScheme !== 'arrows') s.humanScheme = 'wasd';
-  if (!['easy', 'medium', 'hard'].includes(s.difficulty)) s.difficulty = 'medium';
+  if (!['easy', 'medium', 'hard', 'expert'].includes(s.difficulty)) s.difficulty = 'medium';
   s.sfxVolume = clamp01(s.sfxVolume, d.sfxVolume);
   s.musicVolume = clamp01(s.musicVolume, d.musicVolume);
   s.powerups = s.powerups !== false;

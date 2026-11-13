@@ -6,7 +6,7 @@ import { emptyIntent, type Controller, type PlayerIntent } from '../input/contro
 import { Arena } from '../physics/arena';
 import { Ball, makeImpactLog, stepBall, collideBallWorld } from '../physics/ball';
 import type { CharacterDef } from './characters';
-import { ballVsPlayer, playerVsPlayer, separatePlayerFromBall } from './interactions';
+import { ballVsPlayer, kickVsPlayer, playerVsPlayer, separatePlayerFromBall } from './interactions';
 import { Player } from './player';
 import { PowerUps } from './powerups';
 import { SuperShot, updateDecoys, WINDUP, type Decoy } from './supers';
@@ -57,6 +57,10 @@ export interface Banner {
 const CLASH_WINDOW = 0.2;
 /** a ball stuck between both players this long pops up by itself */
 const STALL_TIME = 0.45;
+/** a ball pinned on top of a crossbar this long pops back into play */
+const BAR_STALL_TIME = 0.75;
+/** during the super wind-up the defender can't come closer to the held ball than this */
+const WINDUP_AURA = 58;
 const KICKOFF_TIME = 1.1;
 const GOAL_TIME = 2.6;
 const BALL_DROP_Y = 170;
@@ -203,24 +207,29 @@ export class Match {
     }
 
     const controllable = this.phase === 'playing' || this.phase === 'goal';
-    // super-shot wind-up: both players stand still (fighting-game style freeze)
+    // super-shot wind-up: the shooter stands still (fighting-game style freeze),
+    // the defender can still move to get in the way (no dash, no super)
     const hold = this.superShot?.holding === true;
+    const shooter = hold ? this.superShot!.owner : -1;
     for (let i = 0; i < 2; i++) {
       const p = this.players[i];
       p.savePrev();
       const intent = this.intents[i];
       const ctrl = this.controllers[i];
       if (ctrl) ctrl.read(intent);
-      if (hold) {
+      if (i === shooter) {
         p.tickAnimation(dt);
         continue;
       }
       // super shots can only be charged, armed and fired in open play (not after a goal)
-      p.superLocked = this.phase !== 'playing';
-      if (this.phase === 'playing') p.addEnergy(dt * ENERGY_PER_SEC);
-      p.update(dt, controllable && ctrl ? intent : this.idle, this.arena, this.events);
+      p.superLocked = this.phase !== 'playing' || hold;
+      if (this.phase === 'playing' && !hold) p.addEnergy(dt * ENERGY_PER_SEC);
+      const use = controllable && ctrl ? intent : this.idle;
+      if (hold && use === intent) intent.dash = 0;
+      p.update(dt, use, this.arena, this.events);
     }
     if (!hold) playerVsPlayer(this.players[0], this.players[1], this.events);
+    else this.windupDefender(shooter as 0 | 1);
 
     // eyes follow the ball
     for (const p of this.players) {
@@ -247,6 +256,13 @@ export class Match {
       this.stepExtraBalls(dt);
     }
 
+    // a swing that didn't meet the ball can catch the other player instead
+    if (!hold && controllable && !this.superShot?.holding && !this.arena.env.noKicks) {
+      const balls = [this.ball, ...this.extraBalls];
+      kickVsPlayer(this.players[0], this.players[1], this.events, balls);
+      kickVsPlayer(this.players[1], this.players[0], this.events, balls);
+    }
+
     if (!hold) this.powerups.update(this, dt);
 
     if (this.phase === 'playing') {
@@ -263,6 +279,75 @@ export class Match {
       if (this.golden || this.timeLeft <= 0) this.endMatch();
       else this.setupKickoff();
     }
+  }
+
+  /**
+   * Wind-up: only the defender moves. The shooter is a statue (pushes, never
+   * gets pushed) and the held ball has an aura the defender can't step into:
+   * stand in the shot's path, but you can't smother the ball.
+   */
+  private windupDefender(shooter: 0 | 1): void {
+    const o = this.players[shooter];
+    const d = this.players[1 - shooter];
+    const ox = o.x;
+    const oy = o.y;
+    const ovx = o.vx;
+    const ovy = o.vy;
+    playerVsPlayer(this.players[0], this.players[1]);
+    d.x -= o.x - ox;
+    d.y -= o.y - oy;
+    o.x = ox;
+    o.y = oy;
+    o.vx = ovx;
+    o.vy = ovy;
+    const b = this.ball;
+    const ar = b.r + WINDUP_AURA;
+    for (const [sx, sy, sr] of [
+      [d.headX, d.headY, d.headR],
+      [d.bodyX, d.bodyY, d.bodyR],
+      [d.x, d.y - 10, 12],
+    ] as Array<[number, number, number]>) {
+      const dx = sx - b.x;
+      const dy = sy - b.y;
+      const rr = ar + sr;
+      if (dx * dx + dy * dy >= rr * rr) continue;
+      // push sideways only (away from the ball): no lifting or sinking the player
+      const side = Math.abs(dx) > 0.5 ? Math.sign(dx) : d.x < b.x ? -1 : 1;
+      const needX = Math.sqrt(rr * rr - dy * dy) - Math.abs(dx);
+      d.x += side * needX;
+      if (side * d.vx < 0) d.vx = 0;
+    }
+    d.x = Math.max(d.halfW, Math.min(W - d.halfW, d.x));
+  }
+
+  /**
+   * A ball sitting on top of a crossbar rolls back into play by itself; when a
+   * player keeps it pinned there (to waste time) it pops up over them.
+   */
+  private checkBarStall(b: Ball, dt: number): void {
+    let on = false;
+    let toward = 1;
+    for (let i = 0; i < 2; i++) {
+      const bar = this.arena.bars[i];
+      if (b.x > bar.x - b.r * 0.6 && b.x < bar.x + bar.w + b.r * 0.6 && b.y < bar.y + 2 && b.y > bar.y - b.r - 80) {
+        on = true;
+        toward = i === 0 ? 1 : -1;
+      }
+    }
+    // judged by position: a pinned ball jitters, but it doesn't go anywhere
+    if (!on || Math.abs(b.x - b.barX) > 45) {
+      b.barT = Math.max(0, b.barT - dt * 2);
+      b.barX = b.x;
+      return;
+    }
+    b.barT += dt;
+    if (b.barT < BAR_STALL_TIME) return;
+    b.barT = 0;
+    b.vx = toward * rand(330, 420);
+    b.vy = -rand(640, 760);
+    b.spin = toward * 12;
+    b.ghostT = 0.32;
+    this.events.emit('clash', { x: b.x, y: b.y });
   }
 
   private stepBallAndContacts(dt: number): void {
@@ -322,6 +407,7 @@ export class Match {
       if (this.superShot && !this.superShot.done && this.superShot.ignores(this, p, false)) continue;
       separatePlayerFromBall(b, p);
     }
+    if (!this.superShot) this.checkBarStall(b, dt);
     if (this.superShot?.done) {
       this.superShot = null;
       b.gravityScale = 1;
@@ -395,6 +481,7 @@ export class Match {
       for (const p of this.players) ballVsPlayer(b, p, this.events, this.players[1 - p.index], noKicks);
       collideBallWorld(b, this.arena, imp, dt);
       for (const p of this.players) separatePlayerFromBall(b, p);
+      this.checkBarStall(b, dt);
       for (const sf of ['ground', 'wall', 'bar', 'ceiling'] as Surface[]) {
         if (imp[sf] > 70) this.events.emit('bounce', { surface: sf, x: b.x, y: b.y, speed: imp[sf] });
       }

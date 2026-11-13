@@ -243,3 +243,39 @@ export function playerVsPlayer(a: Player, b: Player, events?: Emitter<GameEvents
     }
   }
 }
+
+/**
+ * A swinging foot catches the other player's legs or body: they are knocked
+ * back and dazed for a moment. A kicked player can't be kicked again right away.
+ */
+export function kickVsPlayer(p: Player, opp: Player, events: Emitter<GameEvents>, balls: Ball[]): boolean {
+  // (a swing that already struck the ball doesn't also hit the player)
+  if (p.kickPhase < KICK_ACTIVE_FROM || p.kickHit || p.kickHitPlayer || opp.kickImmuneT > 0) return false;
+  // the swing was for the ball, not for the player: a ball at the foot, or one
+  // in the space between the two of them (a scramble for it)
+  const oppAhead = (opp.x - p.x) * p.facing;
+  for (const b of balls) {
+    const dx = b.x - p.footX;
+    const dy = b.y - p.footY;
+    if (dx * dx + dy * dy < (b.r + 70) ** 2) return false;
+    const ballAhead = (b.x - p.x) * p.facing;
+    if (ballAhead > -b.r && ballAhead < oppAhead + b.r + 10 && b.y > p.headY - p.headR - 110) return false;
+  }
+  // only right in front of the kicker: the big heads keep the bodies apart, so
+  // "within reach" is heads (almost) touching, with the foot at the height of
+  // the other player's legs or body
+  if (oppAhead <= 0 || oppAhead > p.headR + opp.headR + 26) return false;
+  if (p.footY < opp.bodyY - opp.bodyR || p.footY > opp.y + 14) return false;
+  p.kickHitPlayer = true;
+  opp.kickImmuneT = 1.5;
+  opp.vx = p.facing * 430 * p.power;
+  if (opp.grounded) opp.vy = -300;
+  opp.grounded = false;
+  opp.stunT = Math.max(opp.stunT, 0.42);
+  opp.kickT = -1;
+  opp.dashT = 0;
+  opp.setExpression('shock', 0.7);
+  p.setExpression('effort', 0.35);
+  events.emit('bump', { player: opp.index, x: (p.footX + opp.x) / 2, y: p.footY - 6, force: 650 });
+  return true;
+}
