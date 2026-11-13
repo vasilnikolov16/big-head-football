@@ -16,6 +16,8 @@ export class TouchControls implements Controller {
   private held = new Map<Btn, number>(); // button -> order it was pressed in
   private pressed = new Set<Btn>();
   private fingers = new Map<number, Btn | null>();
+  /** where each finger was last seen (to find fingers whose "up" never arrived) */
+  private fingerPos = new Map<number, { x: number; y: number }>();
   private seq = 0;
   private taps = new DoubleTap();
   private visible = true;
@@ -97,9 +99,26 @@ export class TouchControls implements Controller {
     root.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
     root.addEventListener('contextmenu', (e) => e.preventDefault());
     root.addEventListener('pointermove', this.move, { passive: false });
-    root.addEventListener('pointerup', this.up);
-    root.addEventListener('pointercancel', this.up);
+    // the finger can be lifted anywhere (it may have slid off the button): listen on the whole window
+    window.addEventListener('pointerup', this.up, true);
+    window.addEventListener('pointercancel', this.up, true);
     root.addEventListener('lostpointercapture', this.up);
+    // safety net: iPhone sometimes never reports a lifted finger (system swipes, the volume
+    // pop-up, a third finger...). Every touch event carries the list of fingers really on the
+    // screen, so any button held by a finger that is no longer there is let go.
+    const sync = (e: TouchEvent): void => {
+      const list = e.touches;
+      window.setTimeout(() => this.syncTouches(list), 0);
+    };
+    window.addEventListener('touchstart', sync, { capture: true, passive: true });
+    window.addEventListener('touchend', sync, { capture: true, passive: true });
+    window.addEventListener('touchcancel', sync, { capture: true, passive: true });
+    // the app went to the background / lost focus: nothing stays pressed
+    window.addEventListener('blur', () => this.letGoAll());
+    window.addEventListener('pagehide', () => this.letGoAll());
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.letGoAll();
+    });
     window.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'touch') this.onFirstTouch();
     });
@@ -149,6 +168,7 @@ export class TouchControls implements Controller {
     }
     const b = this.btnAt(e.clientX, e.clientY);
     this.fingers.set(e.pointerId, b);
+    this.fingerPos.set(e.pointerId, { x: e.clientX, y: e.clientY });
     this.press(b);
     try {
       this.root.setPointerCapture?.(e.pointerId);
@@ -164,6 +184,7 @@ export class TouchControls implements Controller {
     }
     if (!this.fingers.has(e.pointerId)) return;
     e.preventDefault();
+    this.fingerPos.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const was = this.fingers.get(e.pointerId) ?? null;
     const now = this.btnAt(e.clientX, e.clientY);
     // a sliding thumb moves from button to button (rolling from kick onto jump presses jump)
@@ -181,10 +202,56 @@ export class TouchControls implements Controller {
       this.onLayoutChange?.({ ...this.layout });
       return;
     }
+    if (!this.fingers.has(e.pointerId)) return;
     const b = this.fingers.get(e.pointerId) ?? null;
     this.fingers.delete(e.pointerId);
+    this.fingerPos.delete(e.pointerId);
     this.release(b);
   };
+
+  /** let go of every button (taps not read yet still count) */
+  private letGoAll(): void {
+    const btns = [...this.fingers.values()];
+    this.fingers.clear();
+    this.fingerPos.clear();
+    for (const b of btns) this.release(b);
+  }
+
+  /**
+   * Compare our fingers with the touches really on the screen. Fingers that are
+   * no longer there (their "up" got lost) let go of their buttons. Each real
+   * touch keeps the closest of our fingers.
+   */
+  private syncTouches(list: TouchList): void {
+    if (this.drag || this.fingers.size === 0) return;
+    if (list.length === 0) {
+      this.letGoAll();
+      return;
+    }
+    if (this.fingers.size <= list.length) return;
+    const keep = new Set<number>();
+    for (let i = 0; i < list.length; i++) {
+      const tch = list[i];
+      let best = -1;
+      let bestD = Infinity;
+      for (const [id, p] of this.fingerPos) {
+        if (keep.has(id)) continue;
+        const d = (p.x - tch.clientX) ** 2 + (p.y - tch.clientY) ** 2;
+        if (d < bestD) {
+          bestD = d;
+          best = id;
+        }
+      }
+      if (best !== -1) keep.add(best);
+    }
+    for (const id of [...this.fingers.keys()]) {
+      if (keep.has(id)) continue;
+      const b = this.fingers.get(id) ?? null;
+      this.fingers.delete(id);
+      this.fingerPos.delete(id);
+      this.release(b);
+    }
+  }
 
   // ------------------------------------------------------------------ look & layout
 
@@ -276,6 +343,7 @@ export class TouchControls implements Controller {
     this.held.clear();
     this.pressed.clear();
     this.fingers.clear();
+    this.fingerPos.clear();
     this.taps.clear();
     for (const el of this.els.values()) el.classList.remove('down');
   }
